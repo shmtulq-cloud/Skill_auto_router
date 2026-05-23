@@ -20,8 +20,9 @@ Skill Usage Review: used <skills>; fit was <good/partial>; missed/next <skill or
 It can optionally record a local feedback loop so the route map improves over time:
 
 ```powershell
-python .\scripts\record_trace.py --task "HVAC market report" --recommended "spec-driven-vibe-coding,market-research" --used "market-research" --missed "verification-loop" --fit partial
+python .\scripts\record_trace.py --task "HVAC market report" --recommended "spec-driven-vibe-coding,market-research" --used "market-research" --missed "verification-loop" --fit partial --severity warning --notice-shown
 python .\scripts\summarize_traces.py
+python .\scripts\skill_health_report.py
 ```
 
 ## What It Does
@@ -31,7 +32,8 @@ python .\scripts\summarize_traces.py
 - Generates a local route map.
 - Ranks likely skills for a task.
 - Records optional local feedback about used/missed/overused skills.
-- Summarizes feedback trends.
+- Records visible notices, corrections, and skill conflicts.
+- Summarizes feedback trends and health issues.
 - Suggests or applies safe project instruction guidance.
 
 ## Install
@@ -61,13 +63,19 @@ python .\scripts\route_task.py "make a cited Philippines HVAC spec-in market rep
 Record feedback after a task:
 
 ```powershell
-python .\scripts\record_trace.py --task "short task summary" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --note "short non-sensitive note"
+python .\scripts\record_trace.py --task "short task summary" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity warning --notice-shown --note "short non-sensitive note"
 ```
 
 Summarize feedback:
 
 ```powershell
 python .\scripts\summarize_traces.py
+```
+
+Create a health report:
+
+```powershell
+python .\scripts\skill_health_report.py
 ```
 
 Suggest a project instruction patch:
@@ -89,6 +97,33 @@ python .\scripts\project_instruction_router.py --project D:\path\to\project --ap
 - It does not mutate installed skills.
 - It does not paste a huge catalog into project instructions.
 - Feedback traces are local and should contain short summaries only, not secrets or full prompts.
+
+## User-Facing Notices
+
+Use these short notices when the route is not clean:
+
+```text
+Skill Usage Notice: warning - verification-loop was missed for a completion claim; action: verify before finishing.
+```
+
+```text
+Skill Conflict Notice: creative-director conflicts with frontend-design on visual direction; chosen order: creative-director -> frontend-design -> browser-qa.
+```
+
+```text
+Correction: switching from market-research only to market-research + deep-research + verification-loop because the task needs sourced claims.
+```
+
+## Health Report
+
+`skill_health_report.py` writes `skill-health-report.md` next to the trace files. It highlights:
+
+- repeated missed skills
+- overused skills
+- conflict clusters
+- missing user-facing notices
+- corrections taken
+- project-instruction update recommendations
 
 ## License
 

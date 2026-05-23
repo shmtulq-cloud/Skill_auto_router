@@ -1,6 +1,6 @@
 ---
 name: skill-router-cartographer
-description: Use before substantial work when installed skills should be selected, audited, mapped, or reflected into project instructions. Scans local Codex-compatible skills, extracts descriptions/triggers/scenarios/overlaps, routes the current task to a short list of best-fit skills, and safely suggests or applies project-instruction guidance.
+description: Use before substantial work when installed skills should be selected, audited, mapped, reflected into project instructions, or reviewed for routing mistakes. Scans local Codex-compatible skills, extracts descriptions/triggers/scenarios/overlaps, routes the current task to a short list of best-fit skills, shows visible skill usage/conflict/correction notices, records local feedback traces, and safely suggests or applies project-instruction guidance.
 metadata:
   short-description: Route work to installed skills
 ---
@@ -44,12 +44,35 @@ Skill Usage Review: used <skills>; fit was <good/partial>; missed/next <skill or
 
 Keep this brief. The visibility note should make routing auditable without turning every answer into a skill catalog.
 
+## Usage Notices
+
+Show notices immediately when routing quality affects the task:
+
+```text
+Skill Usage Notice: <info|warning|correction|blocker> - <what went wrong or changed>; action: <what happens next>
+```
+
+Use these levels:
+
+- `info` - useful visibility only.
+- `warning` - a skill may have been missed, overused, or in tension with another skill.
+- `correction` - the route was wrong or incomplete and has been corrected during the task.
+- `blocker` - do not claim completion until the missing verification, source check, or conflict decision is handled.
+
+When multiple skills conflict, show the conflict and the chosen order:
+
+```text
+Skill Conflict Notice: <skill-a> conflicts with <skill-b>; chosen order: <primary workflow> -> <domain/tool support> -> <verification>.
+```
+
+If a verification skill was missed before completion, stop and verify, or clearly state why verification cannot be completed. If the same missed skill appears three or more times in the feedback history, recommend updating project instructions.
+
 ## Feedback Loop
 
-When the user gives feedback about skill use, or when a task clearly reveals a missed or overused skill, record a compact local trace:
+When the user gives feedback about skill use, or when a task clearly reveals a missed, overused, conflicting, or corrected skill route, record a compact local trace:
 
 ```bash
-python scripts/record_trace.py --task "<short summary>" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --note "<short non-sensitive note>"
+python scripts/record_trace.py --task "<short summary>" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity warning --notice-shown --note "<short non-sensitive note>"
 ```
 
 Use `fit` values:
@@ -65,11 +88,18 @@ Summarize feedback history:
 python scripts/summarize_traces.py
 ```
 
+Create a health report when the user asks how routing is performing, when many skills appear to overlap, or after several routing corrections:
+
+```bash
+python scripts/skill_health_report.py
+```
+
 This writes:
 
 ```text
 ~/.codex/skill-router/skill-trace.jsonl
 ~/.codex/skill-router/skill-trace-summary.md
+~/.codex/skill-router/skill-health-report.md
 ```
 
 Privacy rule: record short task summaries and skill names, not full user prompts, secrets, raw files, or private conversation text.
@@ -91,13 +121,19 @@ python scripts/route_task.py "make a cited Philippines HVAC spec-in market repor
 Record routing feedback:
 
 ```bash
-python scripts/record_trace.py --task "HVAC market report" --recommended "spec-driven-vibe-coding,market-research" --used "market-research" --missed "verification-loop" --fit partial
+python scripts/record_trace.py --task "HVAC market report" --recommended "spec-driven-vibe-coding,market-research" --used "market-research" --missed "verification-loop" --fit partial --severity warning --notice-shown
 ```
 
 Summarize routing feedback:
 
 ```bash
 python scripts/summarize_traces.py
+```
+
+Create routing health report:
+
+```bash
+python scripts/skill_health_report.py
 ```
 
 Suggest project instruction guidance:
@@ -123,6 +159,9 @@ By default scripts write private local outputs to:
 - `skill-map.json` - machine-readable inventory.
 - `skill-roadmap.md` - human-readable route map.
 - `overlaps.md` - likely exact and topic-level overlaps.
+- `skill-trace.jsonl` - compact private feedback events.
+- `skill-trace-summary.md` - aggregate feedback summary.
+- `skill-health-report.md` - user-facing attention items, conflicts, and instruction recommendations.
 
 ## Routing Hints
 

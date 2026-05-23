@@ -34,6 +34,20 @@ If no skill is useful, write `Skill Route: none` with a short reason.
 
 At completion, include a brief `Skill Usage Review` stating which skills were used, whether the fit was correct, and any missed or next-step skill.
 
+If skill routing quality affects the task, show a visible notice immediately:
+
+```text
+Skill Usage Notice: <info|warning|correction|blocker> - <issue>; action: <what happens next>
+```
+
+If multiple skills conflict, show:
+
+```text
+Skill Conflict Notice: <skill-a> conflicts with <skill-b>; chosen order: <primary workflow> -> <supporting skill> -> <verification>.
+```
+
+If a verification skill was missed before claiming completion, stop and verify or clearly say verification could not be completed. If the same missed skill appears repeatedly, suggest updating these project instructions.
+
 Use `skill-router-cartographer` when skill choice is unclear, after installing new skills, or when this project's instructions need an updated skill route map. Use `ecc-guide` or `using-superpowers` as fallback routers for their ecosystems.
 
 Default routing:
