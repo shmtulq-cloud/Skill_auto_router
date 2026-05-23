@@ -11,12 +11,15 @@ from collections import Counter, defaultdict
 TOPIC_KEYWORDS: dict[str, list[str]] = {
     "research": ["research", "market", "source", "citation", "competitive", "intelligence", "deep"],
     "product": ["product", "prd", "spec", "spec-in", "capability", "roadmap", "requirements"],
-    "design": ["design", "visual", "slide", "ppt", "artifact", "figma", "creative", "brand", "prototype"],
+    "design": [
+        "design", "visual", "slide", "ppt", "artifact", "figma", "creative", "brand", "prototype",
+        "视觉", "生图", "配图", "图片", "插图", "封面", "主视觉", "分镜", "海报",
+    ],
     "code": ["code", "repo", "backend", "frontend", "api", "database", "migration", "refactor"],
     "debug": ["debug", "bug", "failing", "error", "tdd", "test", "verification", "review"],
     "automation": ["automation", "workflow", "agent", "mcp", "github", "ops", "schedule"],
     "maintenance": ["codex", "fast", "state", "log", "session", "maintenance", "archive"],
-    "content": ["content", "article", "social", "wechat", "writing", "copy", "newsletter"],
+    "content": ["content", "article", "social", "wechat", "writing", "copy", "newsletter", "公众号", "微信", "文章"],
     "data": ["data", "spreadsheet", "csv", "sql", "analytics", "dashboard"],
     "security": ["security", "auth", "secret", "owasp", "vulnerability", "compliance"],
 }
@@ -25,6 +28,22 @@ STOPWORDS = {
     "the", "and", "for", "with", "when", "use", "this", "that", "from", "into",
     "your", "user", "users", "skill", "skills", "task", "tasks", "work", "working",
     "help", "helps", "using", "build", "create", "make", "need", "needs",
+}
+
+CHINESE_PHRASES = [
+    "公众号", "微信", "文章", "生图", "配图", "图片", "插图", "画图", "绘图",
+    "封面", "主视觉", "标题图", "横版", "竖版", "海报", "视觉", "分镜",
+    "小红书", "朋友圈", "草稿箱",
+]
+
+SKIP_SCAN_PARTS = {
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
 }
 
 
@@ -66,6 +85,9 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     index = 0
     while index < len(lines):
         line = lines[index]
+        if line.startswith((" ", "\t")):
+            index += 1
+            continue
         if not line.strip() or line.lstrip().startswith("#") or ":" not in line:
             index += 1
             continue
@@ -83,13 +105,26 @@ def parse_frontmatter(text: str) -> dict[str, str]:
                 index += 1
             data[key] = " ".join(x for x in block if x).strip()
             continue
+        if value == "":
+            block = []
+            index += 1
+            while index < len(lines):
+                nxt = lines[index]
+                if nxt and not nxt.startswith((" ", "\t")) and ":" in nxt:
+                    break
+                block.append(nxt.strip())
+                index += 1
+            data[key] = "\n".join(x for x in block if x).strip()
+            continue
         data[key] = value.strip().strip('"').strip("'")
         index += 1
     return data
 
 
 def tokenize(text: str) -> list[str]:
-    tokens = re.findall(r"[a-zA-Z][a-zA-Z0-9_+-]{2,}|[\u4e00-\u9fff]{2,}", text.lower())
+    lowered = text.lower()
+    tokens = re.findall(r"[a-zA-Z][a-zA-Z0-9_+-]{2,}|[\u4e00-\u9fff]{2,}", lowered)
+    tokens.extend(phrase for phrase in CHINESE_PHRASES if phrase in text)
     return [t for t in tokens if t not in STOPWORDS]
 
 
@@ -122,30 +157,57 @@ def extract_triggers(text: str) -> list[str]:
     return deduped[:12]
 
 
+def split_frontmatter_list(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    items: list[str] = []
+    for line in raw.splitlines():
+        item = line.strip()
+        if item.startswith("-"):
+            item = item[1:].strip()
+        item = item.strip().strip('"').strip("'")
+        if item:
+            items.append(item)
+    return items
+
+
+def iter_skill_files(skills_dir: Path, max_depth: int = 4) -> list[Path]:
+    root = skills_dir.expanduser()
+    if not root.exists():
+        return []
+    files: list[Path] = []
+    for skill_md in root.rglob("SKILL.md"):
+        rel_parts = skill_md.relative_to(root).parts
+        if len(rel_parts) > max_depth + 1:
+            continue
+        if any(part in SKIP_SCAN_PARTS for part in rel_parts):
+            continue
+        files.append(skill_md)
+    return sorted(files, key=lambda p: str(p).lower())
+
+
 def scan_skills(skills_dir: Path) -> list[SkillRecord]:
     records: list[SkillRecord] = []
     if not skills_dir.exists():
         return records
-    for skill_dir in sorted(skills_dir.iterdir(), key=lambda p: p.name.lower()):
-        if not skill_dir.is_dir() or skill_dir.name.startswith("."):
-            continue
-        skill_md = skill_dir / "SKILL.md"
-        if not skill_md.exists():
-            continue
+    for skill_md in iter_skill_files(skills_dir):
+        skill_dir = skill_md.parent
         text = skill_md.read_text(encoding="utf-8", errors="replace")
         meta = parse_frontmatter(text)
         name = meta.get("name") or skill_dir.name
         description = meta.get("description") or ""
         keyword_counts = Counter(tokenize(f"{name} {description}"))
         keywords = [word for word, _ in keyword_counts.most_common(20)]
+        rel_folder = str(skill_dir.relative_to(skills_dir)).replace("\\", "/")
+        triggers = split_frontmatter_list(meta.get("triggers")) + extract_triggers(description)
         records.append(
             SkillRecord(
                 name=name,
-                folder=skill_dir.name,
+                folder=rel_folder,
                 path=str(skill_dir),
                 description=description,
                 topics=classify(name, description),
-                triggers=extract_triggers(description),
+                triggers=triggers[:12],
                 keywords=keywords,
             )
         )
