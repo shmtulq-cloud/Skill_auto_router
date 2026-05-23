@@ -20,6 +20,30 @@ Use this skill as a lightweight router before substantial work, especially when 
 4. Load only the selected skills' full `SKILL.md` files.
 5. If project instructions need routing guidance, propose a patch first. Apply only after user approval.
 
+## Required Visibility
+
+For every non-trivial response, show a compact skill-routing note before doing the work:
+
+```text
+Skill Route: <primary skill> + <supporting skills> + <verification skill>
+Why: <one short reason>
+```
+
+If no skill is useful, say:
+
+```text
+Skill Route: none
+Why: task is trivial / no installed skill adds value
+```
+
+At completion, include a short review when skills affected the work:
+
+```text
+Skill Usage Review: used <skills>; fit was <good/partial>; missed/next <skill or none>.
+```
+
+Keep this brief. The visibility note should make routing auditable without turning every answer into a skill catalog.
+
 ## Commands
 
 Refresh the local route map:

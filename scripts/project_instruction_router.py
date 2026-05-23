@@ -23,6 +23,17 @@ ROUTING_BLOCK = f"""\
 
 Before substantial work, check whether an installed skill fits the task. If a relevant skill exists, use it or briefly explain why it is not needed.
 
+For every non-trivial task, show a compact route note before doing the work:
+
+```text
+Skill Route: <primary skill> + <supporting skills> + <verification skill>
+Why: <one short reason>
+```
+
+If no skill is useful, write `Skill Route: none` with a short reason.
+
+At completion, include a brief `Skill Usage Review` stating which skills were used, whether the fit was correct, and any missed or next-step skill.
+
 Use `skill-router-cartographer` when skill choice is unclear, after installing new skills, or when this project's instructions need an updated skill route map. Use `ecc-guide` or `using-superpowers` as fallback routers for their ecosystems.
 
 Default routing:

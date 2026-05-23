@@ -4,6 +4,19 @@
 
 It scans local skills, builds a route map, recommends skills for the current task, and can add a concise routing block to project instructions.
 
+It also encourages always-visible routing:
+
+```text
+Skill Route: <primary skill> + <supporting skills> + <verification skill>
+Why: <one short reason>
+```
+
+and a short completion review:
+
+```text
+Skill Usage Review: used <skills>; fit was <good/partial>; missed/next <skill or none>.
+```
+
 ## What It Does
 
 - Reads installed `SKILL.md` frontmatter.
