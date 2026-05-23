@@ -20,6 +20,22 @@ Use this skill as a lightweight router before substantial work, especially when 
 4. Load only the selected skills' full `SKILL.md` files.
 5. If project instructions need routing guidance, propose a patch first. Apply only after user approval.
 
+## Post-Install Onboarding
+
+After this skill is installed, after new skills are installed, or on first use in a project, check whether the project already has skill-routing guidance:
+
+```bash
+python scripts/onboarding_check.py --project <path> --scope both
+```
+
+If guidance is missing, ask before changing anything:
+
+```text
+Setup Notice: skill-router-cartographer is installed, but this project does not yet ask agents to route tasks through skills. I can add a short routing block to <instruction file>. Apply it?
+```
+
+Prefer project instructions first because they affect only the current project. Offer global instructions only when the user wants the behavior across all projects. Never silently edit global or project instructions.
+
 ## Required Visibility
 
 For every non-trivial response, show a compact skill-routing note before doing the work:
@@ -110,6 +126,12 @@ Refresh the local route map:
 
 ```bash
 python scripts/scan_skills.py
+```
+
+Check onboarding state:
+
+```bash
+python scripts/onboarding_check.py --project <path> --scope both
 ```
 
 Route a task:

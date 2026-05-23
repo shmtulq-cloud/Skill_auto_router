@@ -46,7 +46,21 @@ Copy-Item -Recurse . "$env:USERPROFILE\.codex\skills\skill-router-cartographer"
 
 Restart Codex after installing.
 
+Then check whether the current project already has the routing instruction:
+
+```powershell
+python .\scripts\onboarding_check.py --project D:\path\to\project --scope both
+```
+
+If it reports missing guidance, ask the user before applying the project instruction patch. Project-level setup is recommended first; global setup is useful only when the user wants this behavior in every project.
+
 ## Usage
+
+Check onboarding state:
+
+```powershell
+python .\scripts\onboarding_check.py --project D:\path\to\project --scope both
+```
 
 Refresh the skill map:
 

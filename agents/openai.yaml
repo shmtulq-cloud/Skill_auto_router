@@ -1,3 +1,3 @@
 display_name: Skill Router Cartographer
 short_description: Routes work to installed skills, records feedback, and reports routing health.
-default_prompt: Use skill-router-cartographer to scan installed skills, recommend which skills should handle my next task, and show any routing notices or conflicts.
+default_prompt: Use skill-router-cartographer to check onboarding, scan installed skills, recommend which skills should handle my next task, and show any routing notices or conflicts.
