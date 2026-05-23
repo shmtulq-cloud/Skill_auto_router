@@ -44,6 +44,36 @@ Skill Usage Review: used <skills>; fit was <good/partial>; missed/next <skill or
 
 Keep this brief. The visibility note should make routing auditable without turning every answer into a skill catalog.
 
+## Feedback Loop
+
+When the user gives feedback about skill use, or when a task clearly reveals a missed or overused skill, record a compact local trace:
+
+```bash
+python scripts/record_trace.py --task "<short summary>" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --note "<short non-sensitive note>"
+```
+
+Use `fit` values:
+
+- `good` - route matched the task.
+- `partial` - useful but missed or overused something.
+- `wrong` - route was clearly bad.
+- `unknown` - worth recording but not enough evidence.
+
+Summarize feedback history:
+
+```bash
+python scripts/summarize_traces.py
+```
+
+This writes:
+
+```text
+~/.codex/skill-router/skill-trace.jsonl
+~/.codex/skill-router/skill-trace-summary.md
+```
+
+Privacy rule: record short task summaries and skill names, not full user prompts, secrets, raw files, or private conversation text.
+
 ## Commands
 
 Refresh the local route map:
@@ -56,6 +86,18 @@ Route a task:
 
 ```bash
 python scripts/route_task.py "make a cited Philippines HVAC spec-in market report"
+```
+
+Record routing feedback:
+
+```bash
+python scripts/record_trace.py --task "HVAC market report" --recommended "spec-driven-vibe-coding,market-research" --used "market-research" --missed "verification-loop" --fit partial
+```
+
+Summarize routing feedback:
+
+```bash
+python scripts/summarize_traces.py
 ```
 
 Suggest project instruction guidance:
