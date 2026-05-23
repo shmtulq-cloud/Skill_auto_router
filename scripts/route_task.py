@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import json
 
+from host_profiles import known_hosts, profiles_for, skill_roots_for
 from skill_router_common import default_out_dir, default_skills_dir, load_map, scan_skills, tokenize, write_map
 
 
@@ -78,7 +79,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Route a task to likely installed skills.")
     parser.add_argument("task", nargs="+")
     parser.add_argument("--map", default=str(default_out_dir() / "skill-map.json"))
-    parser.add_argument("--skills-dir", default=str(default_skills_dir()))
+    parser.add_argument("--host", default="codex", choices=known_hosts() + ["all"])
+    parser.add_argument("--project", default=".", help="Project folder used to resolve project-local skill roots.")
+    parser.add_argument("--skills-dir", action="append", help="Explicit skill directory. Can be passed more than once.")
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--limit", type=int, default=8)
@@ -89,16 +92,46 @@ def main() -> int:
     map_path = Path(args.map).expanduser().resolve()
 
     if args.refresh or not map_path.exists():
-        records = scan_skills(Path(args.skills_dir).expanduser().resolve())
+        project = Path(args.project).expanduser().resolve()
+        if args.skills_dir:
+            skill_dirs = [Path(item).expanduser().resolve() for item in args.skills_dir]
+        else:
+            skill_dirs = []
+            for profile in profiles_for(args.host):
+                skill_dirs.extend(skill_roots_for(profile, project))
+            if not skill_dirs:
+                skill_dirs = [default_skills_dir()]
+        deduped_dirs = []
+        seen_dirs: set[str] = set()
+        for skills_dir in skill_dirs:
+            key = str(skills_dir.expanduser().resolve() if skills_dir.exists() else skills_dir.expanduser())
+            if key in seen_dirs:
+                continue
+            seen_dirs.add(key)
+            deduped_dirs.append(skills_dir)
+        skill_dirs = deduped_dirs
+        records = []
+        seen_records: set[tuple[str, str]] = set()
+        for skills_dir in skill_dirs:
+            for record in scan_skills(skills_dir):
+                key = (record.name.lower(), record.description.strip().lower())
+                if key in seen_records:
+                    continue
+                seen_records.add(key)
+                records.append(record)
         write_map(records, map_path.parent)
     else:
         records = load_map(map_path)
 
-    ranked = []
+    ranked_by_name = {}
     for skill in records:
         score, reasons = score_skill(query_tokens, query_text, skill)
         if score > 0:
-            ranked.append({"skill": skill, "score": score, "reasons": reasons})
+            key = skill.name.lower()
+            item = {"skill": skill, "score": score, "reasons": reasons}
+            if key not in ranked_by_name or score > ranked_by_name[key]["score"]:
+                ranked_by_name[key] = item
+    ranked = list(ranked_by_name.values())
     ranked.sort(key=lambda item: (-item["score"], item["skill"].name.lower()))
     top = ranked[: args.limit]
 

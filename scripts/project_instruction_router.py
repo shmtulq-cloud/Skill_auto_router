@@ -4,20 +4,13 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-
-INSTRUCTION_NAMES = [
-    "AGENTS.md",
-    "CLAUDE.md",
-    "GEMINI.md",
-    ".github/copilot-instructions.md",
-    ".codex/instructions.md",
-    "project-rules.md",
-]
+from host_profiles import find_instruction, known_hosts, profile_for
 
 BEGIN = "<!-- skill-router:start -->"
 END = "<!-- skill-router:end -->"
 
-ROUTING_BLOCK = f"""\
+ROUTING_BLOCK_TEMPLATE = """\
+{frontmatter}\
 {BEGIN}
 ## Skill Routing
 
@@ -56,47 +49,61 @@ Default routing:
 - Design, prototypes, slides, and visual direction: Open Design skills such as `creative-director`, `design-brief`, `artifacts-builder`.
 - Codebase context packing and onboarding: `repomix`, `repo-scan`, `codebase-onboarding`.
 - Debugging, TDD, and completion checks: `systematic-debugging`, `tdd-workflow`, `verification-loop`.
+
+Host profile: `{host_id}` ({host_name}). {host_note}
 {END}
 """
 
 
-def find_instruction(project: Path) -> Path:
-    for name in INSTRUCTION_NAMES:
-        candidate = project / name
-        if candidate.exists():
-            return candidate
-    return project / "AGENTS.md"
+def routing_block(host: str, include_frontmatter: bool = True) -> str:
+    profile = profile_for(host)
+    return ROUTING_BLOCK_TEMPLATE.format(
+        frontmatter=profile.steering_frontmatter if include_frontmatter else "",
+        BEGIN=BEGIN,
+        END=END,
+        host_id=profile.id,
+        host_name=profile.display_name,
+        host_note=profile.note,
+    )
 
 
-def upsert_block(old: str) -> tuple[str, bool]:
+def upsert_block(old: str, block: str) -> tuple[str, bool]:
     if BEGIN in old and END in old:
         start = old.index(BEGIN)
         end = old.index(END, start) + len(END)
-        new = old[:start].rstrip() + "\n\n" + ROUTING_BLOCK.rstrip() + "\n\n" + old[end:].lstrip()
+        new = old[:start].rstrip() + "\n\n" + block.rstrip() + "\n\n" + old[end:].lstrip()
         return new, True
     if "skill-router-cartographer" in old:
         return old, False
-    return old.rstrip() + "\n\n" + ROUTING_BLOCK + "\n", True
+    if old.strip():
+        return old.rstrip() + "\n\n" + block + "\n", True
+    return block + "\n", True
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Suggest or apply project instruction skill-routing guidance.")
     parser.add_argument("--project", default=".")
+    parser.add_argument("--host", default="codex", choices=known_hosts())
+    parser.add_argument("--scope", default="project", choices=["project", "global"])
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
 
     project = Path(args.project).expanduser().resolve()
-    instruction = find_instruction(project)
+    profile = profile_for(args.host)
+    instruction = find_instruction(project, profile, args.scope)
     old = instruction.read_text(encoding="utf-8", errors="replace") if instruction.exists() else ""
-    new, changed = upsert_block(old)
+    block = routing_block(args.host, include_frontmatter=not old.strip())
+    new, changed = upsert_block(old, block)
 
+    print(f"host={profile.id}")
+    print(f"scope={args.scope}")
     print(f"instruction={instruction}")
     if not changed:
         print("already_configured=true")
         return 0
 
     print("--- suggested block ---")
-    print(ROUTING_BLOCK)
+    print(block)
 
     if not args.apply:
         print("apply=false")

@@ -1,6 +1,6 @@
 # Skill Auto Router
 
-`skill-router-cartographer` is a Codex-compatible meta-skill for people who install many skills and want better routing.
+`skill-router-cartographer` is a Codex-compatible meta-skill for people who install many skills and want better routing. It also includes host profiles for Claude Code, Kiro, Antigravity, OpenCode, OpenClaw, Hermes, and portable AGENTS.md-based agents.
 
 It scans local skills, builds a route map, recommends skills for the current task, and can add a concise routing block to project instructions.
 
@@ -49,7 +49,7 @@ Restart Codex after installing.
 Then check whether the current project already has the routing instruction:
 
 ```powershell
-python .\scripts\onboarding_check.py --project D:\path\to\project --scope both
+python .\scripts\onboarding_check.py --project D:\path\to\project --host all --scope both
 ```
 
 If it reports missing guidance, ask the user before applying the project instruction patch. Project-level setup is recommended first; global setup is useful only when the user wants this behavior in every project.
@@ -59,13 +59,19 @@ If it reports missing guidance, ask the user before applying the project instruc
 Check onboarding state:
 
 ```powershell
-python .\scripts\onboarding_check.py --project D:\path\to\project --scope both
+python .\scripts\onboarding_check.py --project D:\path\to\project --host all --scope both
 ```
 
 Refresh the skill map:
 
 ```powershell
 python .\scripts\scan_skills.py
+```
+
+Refresh across known host skill roots:
+
+```powershell
+python .\scripts\scan_skills.py --host all --project D:\path\to\project
 ```
 
 Route a task:
@@ -95,14 +101,38 @@ python .\scripts\skill_health_report.py
 Suggest a project instruction patch:
 
 ```powershell
-python .\scripts\project_instruction_router.py --project D:\path\to\project
+python .\scripts\project_instruction_router.py --host codex --project D:\path\to\project
 ```
 
 Apply the patch:
 
 ```powershell
-python .\scripts\project_instruction_router.py --project D:\path\to\project --apply
+python .\scripts\project_instruction_router.py --host codex --project D:\path\to\project --apply
 ```
+
+## Host Profiles
+
+Use `--host` when checking, scanning, or installing instruction guidance:
+
+| Host | Default project instruction | Global instruction | Notes |
+|---|---|---|---|
+| `codex` | `AGENTS.md` | `~/.codex/AGENTS.md` | OpenAI Codex default. |
+| `claude-code` | `CLAUDE.md` | `~/.claude/CLAUDE.md` | Claude Code memory/instructions. |
+| `kiro` | `.kiro/steering/skill-routing.md` | `~/.kiro/steering/AGENTS.md` | Writes always-on steering frontmatter for new steering files. |
+| `antigravity` | `AGENTS.md` | `~/.gemini/GEMINI.md` | Portable profile; also detects `GEMINI.md`, `.agents/rules`, and `.agents/skills`. |
+| `opencode` | `AGENTS.md` | `~/.config/opencode/AGENTS.md` | Uses OpenCode AGENTS.md plus Claude Code fallbacks. |
+| `openclaw` | `AGENTS.md` | `~/.openclaw/AGENTS.md` | Keeps persona files such as `SOUL.md` out of default edits. |
+| `hermes` | `AGENTS.md` | `~/.hermes/AGENTS.md` | Works with Hermes skill discovery when available. |
+| `universal` | `AGENTS.md` | `~/AGENTS.md` | Fallback for mixed or unknown agents. |
+
+Compatibility references used for the defaults:
+
+- Claude Code memory/instructions: https://docs.anthropic.com/en/docs/claude-code/memory
+- Claude Code skills: https://docs.anthropic.com/en/docs/claude-code/skills
+- Kiro steering and AGENTS.md: https://kiro.dev/docs/steering/
+- OpenCode AGENTS.md rules: https://opencode.ai/docs/rules/
+- OpenCode skills: https://opencode.ai/docs/skills/
+- Antigravity skills: https://antigravity.google/docs/skills?authuser=2&hl=pt
 
 ## Safety
 

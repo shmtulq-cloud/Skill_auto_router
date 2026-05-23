@@ -4,8 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
-from project_instruction_router import BEGIN, find_instruction
-from skill_router_common import codex_home
+from host_profiles import find_instruction, known_hosts, profile_for, profiles_for
+from project_instruction_router import BEGIN
 
 
 def is_configured(path: Path) -> bool:
@@ -15,20 +15,25 @@ def is_configured(path: Path) -> bool:
     return BEGIN in text or "skill-router-cartographer" in text
 
 
-def check_target(label: str, root: Path) -> dict[str, object]:
-    instruction = find_instruction(root)
+def check_target(host: str, label: str, root: Path) -> dict[str, object]:
+    profile = profile_for(host)
+    instruction = find_instruction(root, profile, label)
     configured = is_configured(instruction)
     return {
+        "host": profile.id,
+        "host_name": profile.display_name,
         "label": label,
         "root": str(root),
         "instruction": str(instruction),
         "configured": configured,
+        "note": profile.note,
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check whether skill-router onboarding guidance is present.")
     parser.add_argument("--project", default=".", help="Project folder to check.")
+    parser.add_argument("--host", default="codex", choices=known_hosts() + ["all"], help="Host or IDE profile to check.")
     parser.add_argument(
         "--scope",
         default="project",
@@ -40,10 +45,11 @@ def main() -> int:
 
     project_root = Path(args.project).expanduser().resolve()
     targets: list[dict[str, object]] = []
-    if args.scope in {"project", "both"}:
-        targets.append(check_target("project", project_root))
-    if args.scope in {"global", "both"}:
-        targets.append(check_target("global", codex_home()))
+    for profile in profiles_for(args.host):
+        if args.scope in {"project", "both"}:
+            targets.append(check_target(profile.id, "project", project_root))
+        if args.scope in {"global", "both"}:
+            targets.append(check_target(profile.id, "global", project_root))
 
     needs_setup = [target for target in targets if not bool(target["configured"])]
     payload = {"targets": targets, "needs_setup": needs_setup}
@@ -54,17 +60,24 @@ def main() -> int:
 
     for target in targets:
         status = "configured" if target["configured"] else "missing"
-        print(f"{target['label']}_status={status}")
-        print(f"{target['label']}_instruction={target['instruction']}")
+        prefix = f"{target['host']}_{target['label']}"
+        print(f"{prefix}_status={status}")
+        print(f"{prefix}_instruction={target['instruction']}")
 
     if needs_setup:
         print("setup_notice=Skill router is installed, but routing guidance is missing from one or more instruction files.")
         print("recommended_next_step=Ask the user before applying project_instruction_router.py --apply.")
         for target in needs_setup:
             if target["label"] == "project":
-                print(f"project_apply_command=python scripts/project_instruction_router.py --project \"{target['root']}\" --apply")
+                print(
+                    f"{target['host']}_project_apply_command="
+                    f"python scripts/project_instruction_router.py --host {target['host']} --project \"{target['root']}\" --apply"
+                )
             if target["label"] == "global":
-                print(f"global_apply_command=python scripts/project_instruction_router.py --project \"{target['root']}\" --apply")
+                print(
+                    f"{target['host']}_global_apply_command="
+                    f"python scripts/project_instruction_router.py --host {target['host']} --scope global --project \"{target['root']}\" --apply"
+                )
     else:
         print("setup_notice=Skill routing guidance is already configured.")
     return 0

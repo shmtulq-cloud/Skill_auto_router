@@ -7,7 +7,7 @@ metadata:
 
 # Skill Router Cartographer
 
-Use this skill as a lightweight router before substantial work, especially when many skills are installed or when the user asks why a skill did or did not trigger.
+Use this skill as a lightweight router before substantial work, especially when many skills are installed or when the user asks why a skill did or did not trigger. It can be used from Codex, Claude Code, Kiro, Antigravity, OpenCode, OpenClaw, Hermes, and other agents that can read Markdown instruction files.
 
 ## Workflow
 
@@ -25,7 +25,7 @@ Use this skill as a lightweight router before substantial work, especially when 
 After this skill is installed, after new skills are installed, or on first use in a project, check whether the project already has skill-routing guidance:
 
 ```bash
-python scripts/onboarding_check.py --project <path> --scope both
+python scripts/onboarding_check.py --project <path> --host all --scope both
 ```
 
 If guidance is missing, ask before changing anything:
@@ -35,6 +35,21 @@ Setup Notice: skill-router-cartographer is installed, but this project does not 
 ```
 
 Prefer project instructions first because they affect only the current project. Offer global instructions only when the user wants the behavior across all projects. Never silently edit global or project instructions.
+
+## Host Profiles
+
+Use `--host` to target a specific IDE or agent:
+
+- `codex` - project `AGENTS.md`, global `~/.codex/AGENTS.md`, skills in `~/.codex/skills`.
+- `claude-code` - project `CLAUDE.md` or `.claude/CLAUDE.md`, global `~/.claude/CLAUDE.md`, skills in `~/.claude/skills`.
+- `kiro` - project `.kiro/steering/skill-routing.md` with always-on steering frontmatter, global `~/.kiro/steering/AGENTS.md`.
+- `antigravity` - project `AGENTS.md` first, with `GEMINI.md` and `.agents/rules/skill-routing.md` as existing-file fallbacks.
+- `opencode` - project `AGENTS.md`, global `~/.config/opencode/AGENTS.md`, with Claude Code fallbacks.
+- `openclaw` - project `AGENTS.md`; keep `SOUL.md` and other persona files for identity instead of routing rules.
+- `hermes` - project `AGENTS.md` or `HERMES.md`, global `~/.hermes/AGENTS.md`; Hermes can use `skills_list` and `skill_view` when available.
+- `universal` - portable `AGENTS.md` profile for unknown or mixed hosts.
+
+Use `--host all` only for audits and scans. Apply instruction patches one host at a time so the user can approve the exact file being changed.
 
 ## Required Visibility
 
@@ -128,16 +143,28 @@ Refresh the local route map:
 python scripts/scan_skills.py
 ```
 
+Refresh a route map across known host skill roots:
+
+```bash
+python scripts/scan_skills.py --host all --project <path>
+```
+
 Check onboarding state:
 
 ```bash
-python scripts/onboarding_check.py --project <path> --scope both
+python scripts/onboarding_check.py --project <path> --host all --scope both
 ```
 
 Route a task:
 
 ```bash
 python scripts/route_task.py "make a cited Philippines HVAC spec-in market report"
+```
+
+Route using another host's skill roots:
+
+```bash
+python scripts/route_task.py "debug a failing build" --host claude-code --refresh
 ```
 
 Record routing feedback:
@@ -161,13 +188,13 @@ python scripts/skill_health_report.py
 Suggest project instruction guidance:
 
 ```bash
-python scripts/project_instruction_router.py --project <path>
+python scripts/project_instruction_router.py --host codex --project <path>
 ```
 
 Apply the project instruction guidance only after approval:
 
 ```bash
-python scripts/project_instruction_router.py --project <path> --apply
+python scripts/project_instruction_router.py --host codex --project <path> --apply
 ```
 
 ## Output Files
