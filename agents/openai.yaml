@@ -1,0 +1,3 @@
+display_name: Skill Router Cartographer
+short_description: Routes work to installed skills and maintains a local skill map.
+default_prompt: Use skill-router-cartographer to scan installed skills and recommend which skills should handle my next task.
