@@ -132,7 +132,7 @@ Compatibility references used for the defaults:
 - Kiro steering and AGENTS.md: https://kiro.dev/docs/steering/
 - OpenCode AGENTS.md rules: https://opencode.ai/docs/rules/
 - OpenCode skills: https://opencode.ai/docs/skills/
-- Antigravity skills: https://antigravity.google/docs/skills?authuser=2&hl=pt
+- Antigravity skills: https://antigravity.google/docs/skills
 
 ## Safety
 
