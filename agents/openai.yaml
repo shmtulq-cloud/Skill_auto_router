@@ -1,3 +1,3 @@
 display_name: Skill Router Cartographer
 short_description: Routes work to installed skills across Codex, Claude Code, Kiro, OpenCode, OpenClaw, Hermes, and more.
-default_prompt: Use skill-router-cartographer to check cross-host onboarding, scan installed skills, recommend which skills should handle my next task, and show any routing notices or conflicts.
+default_prompt: Use skill-router-cartographer to check cross-host onboarding, ask whether project or user/global instructions should include skill-routing guidance, scan installed skills, recommend which skills should handle my next task, and show any routing notices or conflicts.

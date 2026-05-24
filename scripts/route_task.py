@@ -49,13 +49,86 @@ CURATED_BOOSTS = [
     ("follow-builders", ["track"], 12, "curated: information tracking"),
 ]
 
+QUERY_EXPANSIONS = [
+    (
+        ["代码索引"],
+        ["source", "asset", "audit", "file", "module", "repository", "codebase", "index", "map"],
+    ),
+    (
+        ["知识图谱"],
+        ["knowledge", "graph", "memory", "mcp", "relations", "relationship", "retrieval", "semantic"],
+    ),
+    (
+        ["全量阅读"],
+        ["scan", "audit", "summary", "map", "overview", "onboarding", "recall", "memory"],
+    ),
+    (
+        ["全量扫描"],
+        ["scan", "audit", "summary", "map", "overview", "onboarding", "recall", "memory"],
+    ),
+    (
+        ["模块关系"],
+        ["module", "architecture", "dependency", "relationship", "map", "graph"],
+    ),
+    (
+        ["依赖图"],
+        ["dependency", "graph", "architecture", "module", "map"],
+    ),
+    (
+        ["调用图"],
+        ["call", "graph", "dependency", "architecture", "module", "map"],
+    ),
+    (
+        ["接手项目"],
+        ["onboarding", "unfamiliar", "codebase", "architecture", "entry", "conventions"],
+    ),
+    (
+        ["理解代码"],
+        ["onboarding", "codebase", "architecture", "entry", "map", "walkthrough"],
+    ),
+    (
+        ["项目记忆"],
+        ["memory", "notes", "save", "recall", "knowledge", "project", "context"],
+    ),
+    (
+        ["架构记忆"],
+        ["architecture", "memory", "notes", "knowledge", "context", "decision"],
+    ),
+    (
+        ["踩坑记录"],
+        ["notes", "gotchas", "recall", "remember", "save", "knowledge"],
+    ),
+    (
+        ["增量审查"],
+        ["review", "diff", "changes", "incremental", "verification", "security", "tests"],
+    ),
+    (
+        ["增量审核"],
+        ["review", "diff", "changes", "incremental", "verification", "security", "tests"],
+    ),
+]
 
-def score_skill(query_tokens: set[str], query_text: str, skill) -> tuple[int, list[str]]:
+
+def expand_query_tokens(query_tokens: set[str], query_text: str) -> set[str]:
+    expanded = set(query_tokens)
+    for terms, additions in QUERY_EXPANSIONS:
+        if all(term in query_tokens or term in query_text for term in terms):
+            expanded.update(additions)
+    return expanded
+
+
+def score_skill(
+    query_tokens: set[str],
+    query_text: str,
+    skill,
+    raw_query_tokens: set[str] | None = None,
+) -> tuple[int, list[str]]:
     score = 0
     reasons: list[str] = []
     name = skill.name.lower()
     description = skill.description.lower()
     keywords = set(skill.keywords)
+    raw_query_tokens = raw_query_tokens or query_tokens
 
     if name in query_text:
         score += 20
@@ -77,7 +150,7 @@ def score_skill(query_tokens: set[str], query_text: str, skill) -> tuple[int, li
             score += min(8, len(query_tokens & trigger_tokens) * 2)
 
     for skill_name, terms, boost, reason in CURATED_BOOSTS:
-        if skill.name == skill_name and all(term in query_tokens or term in query_text for term in terms):
+        if skill.name == skill_name and all(term in raw_query_tokens or term in query_text for term in terms):
             score += boost
             reasons.append(reason)
 
@@ -97,7 +170,8 @@ def main() -> int:
     args = parser.parse_args()
 
     query_text = " ".join(args.task).lower()
-    query_tokens = set(tokenize(query_text))
+    raw_query_tokens = set(tokenize(query_text))
+    query_tokens = expand_query_tokens(raw_query_tokens, query_text)
     map_path = Path(args.map).expanduser().resolve()
 
     if args.refresh or not map_path.exists():
@@ -134,7 +208,7 @@ def main() -> int:
 
     ranked_by_name = {}
     for skill in records:
-        score, reasons = score_skill(query_tokens, query_text, skill)
+        score, reasons = score_skill(query_tokens, query_text, skill, raw_query_tokens)
         if score > 0:
             key = skill.name.lower()
             item = {"skill": skill, "score": score, "reasons": reasons}

@@ -48,6 +48,7 @@ Default routing:
 - Product definition, PRD, spec-in, and implementation packages: `spec-driven-vibe-coding`, `product-lens`, `product-capability`.
 - Design, prototypes, slides, and visual direction: Open Design skills such as `creative-director`, `design-brief`, `artifacts-builder`.
 - Codebase context packing and onboarding: `repomix`, `repo-scan`, `codebase-onboarding`.
+- Reusable code review memory, code indexes, or avoiding repeated full-repo reads: route to locally installed codebase scanning, onboarding, knowledge/memory, note-taking, review, and verification skills. Do not assume those exact skills exist on every machine.
 - Debugging, TDD, and completion checks: `systematic-debugging`, `tdd-workflow`, `verification-loop`.
 
 Host profile: `{host_id}` ({host_name}). {host_note}

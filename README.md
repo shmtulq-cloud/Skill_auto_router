@@ -3,6 +3,7 @@
 `skill-router-cartographer` is a Codex-compatible meta-skill for people who install many skills and want better routing. It also includes host profiles for Claude Code, Kiro, Antigravity, OpenCode, OpenClaw, Hermes, and portable AGENTS.md-based agents.
 
 It scans local skills, builds a route map, recommends skills for the current task, and can add a concise routing block to project instructions.
+It does not bundle or depend on the author's personal skill inventory; each machine is routed against its own installed `SKILL.md` files.
 
 It also encourages always-visible routing:
 
@@ -46,13 +47,22 @@ Copy-Item -Recurse . "$env:USERPROFILE\.codex\skills\skill-router-cartographer"
 
 Restart Codex after installing.
 
-Then check whether the current project already has the routing instruction:
+Then run the post-install onboarding check. This is important: installing the skill makes it available, but most IDEs/agents will not reliably call it unless project or user-level instructions tell them to route work through installed skills.
 
 ```powershell
 python .\scripts\onboarding_check.py --project D:\path\to\project --host all --scope both
 ```
 
-If it reports missing guidance, ask the user before applying the project instruction patch. Project-level setup is recommended first; global setup is useful only when the user wants this behavior in every project.
+If it reports missing guidance, ask the user before applying any change:
+
+```text
+Setup Notice: skill-router-cartographer is installed, but this project/user profile does not yet ask agents to route work through installed skills.
+Why: without a short instruction block, the skill may be installed but rarely triggered.
+Recommended: add it to the project instruction file first so it only affects this workspace. Add it globally only if you want skill routing across all projects on this machine.
+Apply project-level guidance, global guidance, both, or skip?
+```
+
+Project-level setup is recommended first; global setup is useful only when the user wants this behavior in every project. The apply command writes a backup before updating an existing instruction file.
 
 ## Usage
 
@@ -78,6 +88,12 @@ Route a task:
 
 ```powershell
 python .\scripts\route_task.py "make a cited Philippines HVAC spec-in market report"
+```
+
+Route a codebase knowledge workflow:
+
+```powershell
+python .\scripts\route_task.py "审核已有代码并生成代码索引，避免每次全量阅读代码"
 ```
 
 Record feedback after a task:

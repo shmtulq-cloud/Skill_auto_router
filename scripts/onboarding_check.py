@@ -66,7 +66,23 @@ def main() -> int:
 
     if needs_setup:
         print("setup_notice=Skill router is installed, but routing guidance is missing from one or more instruction files.")
-        print("recommended_next_step=Ask the user before applying project_instruction_router.py --apply.")
+        print(
+            "why=Without one short instruction in project or user-level agent instructions, "
+            "many IDEs/agents will not proactively invoke this skill before work begins."
+        )
+        print(
+            "ask_user=Do you want me to add a concise skill-routing instruction block? "
+            "Recommended: project instructions first. Choose project, global, both, or skip."
+        )
+        print(
+            "project_scope_reason=Project instructions are safer for teams and repos because they affect only this workspace."
+        )
+        print(
+            "global_scope_reason=User/global instructions make skill routing active across future projects on this machine, "
+            "but should be used only when the user wants that default everywhere."
+        )
+        print("safety=Never apply instruction changes silently; project_instruction_router.py writes a backup when updating an existing file.")
+        print("recommended_next_step=Ask the user, then apply the exact command for the chosen scope.")
         for target in needs_setup:
             if target["label"] == "project":
                 print(

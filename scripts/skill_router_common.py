@@ -15,8 +15,11 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "design", "visual", "slide", "ppt", "artifact", "figma", "creative", "brand", "prototype",
         "视觉", "生图", "配图", "图片", "插图", "封面", "主视觉", "分镜", "海报",
     ],
-    "code": ["code", "repo", "backend", "frontend", "api", "database", "migration", "refactor"],
-    "debug": ["debug", "bug", "failing", "error", "tdd", "test", "verification", "review"],
+    "code": [
+        "code", "repo", "backend", "frontend", "api", "database", "migration", "refactor",
+        "代码", "代码库", "仓库", "模块", "架构", "索引", "代码索引", "知识图谱", "依赖图", "调用图",
+    ],
+    "debug": ["debug", "bug", "failing", "error", "tdd", "test", "verification", "review", "审查", "审核", "增量"],
     "automation": ["automation", "workflow", "agent", "mcp", "github", "ops", "schedule"],
     "maintenance": ["codex", "fast", "state", "log", "session", "maintenance", "archive"],
     "content": ["content", "article", "social", "wechat", "writing", "copy", "newsletter", "公众号", "微信", "文章"],
@@ -34,6 +37,9 @@ CHINESE_PHRASES = [
     "公众号", "微信", "文章", "生图", "配图", "图片", "插图", "画图", "绘图",
     "封面", "主视觉", "标题图", "横版", "竖版", "海报", "视觉", "分镜",
     "小红书", "朋友圈", "草稿箱",
+    "代码", "代码库", "代码审核", "代码审查", "代码索引", "知识图谱", "架构图",
+    "模块关系", "调用图", "依赖图", "增量审查", "增量审核", "全量阅读", "全量扫描",
+    "接手项目", "理解代码", "项目记忆", "架构记忆", "踩坑记录",
 ]
 
 SKIP_SCAN_PARTS = {

@@ -22,19 +22,24 @@ Use this skill as a lightweight router before substantial work, especially when 
 
 ## Post-Install Onboarding
 
-After this skill is installed, after new skills are installed, or on first use in a project, check whether the project already has skill-routing guidance:
+After this skill is installed, after new skills are installed, or on first use in a project, check whether the project or user instructions already have skill-routing guidance:
 
 ```bash
 python scripts/onboarding_check.py --project <path> --host all --scope both
 ```
 
-If guidance is missing, ask before changing anything:
+If guidance is missing, show the user why this matters and ask before changing anything. The key reason is simple: installing a skill makes it available, but many IDEs/agents will not proactively call it unless their project or user-level instructions tell them to route work through installed skills.
+
+Use this exact prompt shape:
 
 ```text
-Setup Notice: skill-router-cartographer is installed, but this project does not yet ask agents to route tasks through skills. I can add a short routing block to <instruction file>. Apply it?
+Setup Notice: skill-router-cartographer is installed, but this project/user profile does not yet ask agents to route work through installed skills.
+Why: without a short instruction block, the skill may be installed but rarely triggered.
+Recommended: add it to the project instruction file first so it only affects this workspace. Add it globally only if you want skill routing across all projects on this machine.
+Apply project-level guidance, global guidance, both, or skip?
 ```
 
-Prefer project instructions first because they affect only the current project. Offer global instructions only when the user wants the behavior across all projects. Never silently edit global or project instructions.
+Prefer project instructions first because they affect only the current project. Offer global instructions only when the user wants the behavior across all projects. Never silently edit global or project instructions. If the user says yes, use `scripts/project_instruction_router.py --apply`; it writes a backup when updating an existing instruction file.
 
 ## Host Profiles
 
@@ -155,6 +160,8 @@ Check onboarding state:
 python scripts/onboarding_check.py --project <path> --host all --scope both
 ```
 
+If the check reports missing guidance, ask the user whether to install project-level or user/global instructions before doing substantial work.
+
 Route a task:
 
 ```bash
@@ -218,6 +225,7 @@ By default scripts write private local outputs to:
 - Product definition, spec-in, PRD, implementation packages: `spec-driven-vibe-coding`, `product-lens`, `product-capability`.
 - Design, prototypes, slides, artifacts, visual direction: Open Design skills such as `creative-director`, `design-brief`, `artifacts-builder`.
 - Codebase context and repo packing: `repomix`, `repo-scan`, `codebase-onboarding`.
+- Reusable code review memory, code indexes, or "avoid reading the whole repo every time": route to locally installed codebase scanning, onboarding, knowledge/memory, note-taking, review, and verification skills. Do not assume those exact skills exist on every machine.
 - Debugging, TDD, completion checks: `systematic-debugging`, `tdd-workflow`, `verification-loop`, `verification-before-completion`.
 - Local Codex state maintenance: `keep-codex-fast`.
 - Information tracking and digests: `follow-builders`.
