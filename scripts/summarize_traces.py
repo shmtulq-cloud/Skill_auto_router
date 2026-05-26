@@ -5,25 +5,7 @@ from collections import Counter, defaultdict
 import json
 from pathlib import Path
 
-from skill_router_common import default_out_dir
-
-
-def load_events(path: Path) -> list[dict[str, object]]:
-    if not path.exists():
-        return []
-    events = []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if not line.strip():
-            continue
-        try:
-            events.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-    return events
-
-
-def as_list(value: object) -> list[str]:
-    return [str(item) for item in value] if isinstance(value, list) else []
+from skill_router_common import clean_skill_list, default_out_dir, load_known_skill_names, load_trace_events, router_identity
 
 
 def main() -> int:
@@ -33,18 +15,24 @@ def main() -> int:
     args = parser.parse_args()
 
     path = Path(args.out_dir).expanduser().resolve() / "skill-trace.jsonl"
-    events = load_events(path)
+    out_dir = Path(args.out_dir).expanduser().resolve()
+    events, invalid_lines = load_trace_events(path)
+    known_names = load_known_skill_names(out_dir)
 
     fits = Counter(str(event.get("fit", "unknown")) for event in events)
     recommended = Counter()
+    required = Counter()
+    optional = Counter()
     used = Counter()
     missed = Counter()
     overused = Counter()
     severities = Counter()
     conflicts = Counter()
     conflict_clusters = Counter()
-    recommended_but_unused = Counter()
+    recommended_candidates_unused = Counter()
+    required_but_unused = Counter()
     used_without_recommendation = Counter()
+    data_quality = Counter()
     notices_required = 0
     notices_shown = 0
     corrections_taken = 0
@@ -52,13 +40,28 @@ def main() -> int:
     pair_stats: dict[str, Counter[str]] = defaultdict(Counter)
 
     for event in events:
-        rec = set(as_list(event.get("recommended")))
-        use = set(as_list(event.get("used")))
-        miss = set(as_list(event.get("missed")))
-        over = set(as_list(event.get("overused")))
-        conflict = set(as_list(event.get("conflicts")))
+        normalization = event.get("normalization")
+        if isinstance(normalization, dict):
+            for notes in normalization.values():
+                if isinstance(notes, list):
+                    data_quality.update(str(note) for note in notes)
+
+        def clean(field: str) -> set[str]:
+            items, notes = clean_skill_list(event.get(field), known_names)
+            data_quality.update(notes)
+            return set(items)
+
+        rec = clean("recommended")
+        req = clean("required")
+        opt = clean("optional")
+        use = clean("used")
+        miss = clean("missed")
+        over = clean("overused")
+        conflict = clean("conflicts")
         severity = str(event.get("severity", "info"))
         recommended.update(rec)
+        required.update(req)
+        optional.update(opt)
         used.update(use)
         missed.update(miss)
         overused.update(over)
@@ -72,11 +75,16 @@ def main() -> int:
                 notices_shown += 1
         if bool(event.get("correction_taken", False)):
             corrections_taken += 1
-        recommended_but_unused.update(rec - use)
+        required_but_unused.update(req - use)
+        recommended_candidates_unused.update((rec - req - opt) - use)
         used_without_recommendation.update(use - rec)
-        for skill in rec | use | miss | over | conflict:
+        for skill in rec | req | opt | use | miss | over | conflict:
             if skill in rec:
                 pair_stats[skill]["recommended"] += 1
+            if skill in req:
+                pair_stats[skill]["required"] += 1
+            if skill in opt:
+                pair_stats[skill]["optional"] += 1
             if skill in use:
                 pair_stats[skill]["used"] += 1
             if skill in miss:
@@ -88,7 +96,9 @@ def main() -> int:
 
     summary = {
         "trace_file": str(path),
+        "router_identity": router_identity(),
         "events": len(events),
+        "invalid_json_lines": invalid_lines,
         "fit_counts": dict(fits),
         "severity_counts": dict(severities),
         "notice_coverage": {
@@ -98,13 +108,17 @@ def main() -> int:
         },
         "corrections_taken": corrections_taken,
         "top_recommended": recommended.most_common(20),
+        "top_required": required.most_common(20),
+        "top_optional": optional.most_common(20),
         "top_used": used.most_common(20),
         "top_missed": missed.most_common(20),
         "top_overused": overused.most_common(20),
         "top_conflicts": conflicts.most_common(20),
         "conflict_clusters": conflict_clusters.most_common(20),
-        "recommended_but_unused": recommended_but_unused.most_common(20),
+        "required_but_unused": required_but_unused.most_common(20),
+        "recommended_candidates_unused": recommended_candidates_unused.most_common(20),
         "used_without_recommendation": used_without_recommendation.most_common(20),
+        "data_quality": data_quality.most_common(20),
         "per_skill": {skill: dict(stats) for skill, stats in sorted(pair_stats.items())},
     }
 
@@ -113,7 +127,9 @@ def main() -> int:
         "# Skill Routing Feedback Summary",
         "",
         f"Trace file: `{path}`",
+        f"Router identity: `{router_identity()['canonical_skill_id']}` ({router_identity()['display_name']})",
         f"Events: {len(events)}",
+        f"Invalid JSONL lines: {len(invalid_lines)}",
         "",
         "## Fit Counts",
         "",
@@ -137,13 +153,17 @@ def main() -> int:
     ])
     for title, counter in [
         ("Top Recommended", recommended),
+        ("Top Required", required),
+        ("Top Optional", optional),
         ("Top Used", used),
         ("Top Missed", missed),
         ("Top Overused", overused),
         ("Top Conflicts", conflicts),
         ("Conflict Clusters", conflict_clusters),
-        ("Recommended But Unused", recommended_but_unused),
+        ("Required But Unused", required_but_unused),
+        ("Recommended Candidates Not Used", recommended_candidates_unused),
         ("Used Without Recommendation", used_without_recommendation),
+        ("Data Quality Notes", data_quality),
     ]:
         lines.extend(["", f"## {title}", ""])
         if not counter:
@@ -157,6 +177,8 @@ def main() -> int:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
     else:
         print(f"events={len(events)}")
+        if invalid_lines:
+            print(f"invalid_json_lines={len(invalid_lines)}")
         print(f"summary={report_path}")
         print(f"trace={path}")
         if missed:

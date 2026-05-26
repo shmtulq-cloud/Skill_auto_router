@@ -1,6 +1,6 @@
 # Post-Install Onboarding
 
-After installing `skill-router-cartographer`, run the onboarding check from the installed skill folder:
+After installing `skill-auto-router`, run the onboarding check from the installed skill folder:
 
 ```powershell
 python .\scripts\onboarding_check.py --project D:\path\to\project --host all --scope both
@@ -9,7 +9,7 @@ python .\scripts\onboarding_check.py --project D:\path\to\project --host all --s
 If guidance is missing, ask the user before applying anything:
 
 ```text
-Setup Notice: skill-router-cartographer is installed, but this project/user profile does not yet ask agents to route work through installed skills.
+Setup Notice: skill-auto-router is installed, but this project/user profile does not yet ask agents to route work through installed skills.
 Why: without a short instruction block, the skill may be installed but rarely triggered.
 Recommended: add it to the project instruction file first so it only affects this workspace. Add it globally only if you want skill routing across all projects on this machine.
 Apply project-level guidance, global guidance, both, or skip?

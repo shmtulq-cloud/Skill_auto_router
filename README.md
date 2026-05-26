@@ -1,6 +1,15 @@
 # Skill Auto Router
 
-`skill-router-cartographer` is a Codex-compatible meta-skill for people who install many skills and want better routing. It also includes host profiles for Claude Code, Kiro, Antigravity, OpenCode, OpenClaw, Hermes, and portable AGENTS.md-based agents.
+`skill-auto-router` is a Codex-compatible meta-skill for people who install many skills and want better routing. It also includes host profiles for Claude Code, Kiro, Antigravity, OpenCode, OpenClaw, Hermes, and portable AGENTS.md-based agents.
+
+Name policy:
+
+- Public name: `Skill Auto Router`.
+- Repository slug: `Skill_auto_router`.
+- Canonical skill id in traces and instructions: `skill-auto-router`.
+- Legacy alias: `skill-router-cartographer`.
+
+Old aliases are normalized to `skill-auto-router` in feedback traces so health reports do not split one skill into several names.
 
 It scans local skills, builds a route map, recommends skills for the current task, and can add a concise routing block to project instructions.
 It does not bundle or depend on the author's personal skill inventory; each machine is routed against its own installed `SKILL.md` files.
@@ -42,8 +51,10 @@ python .\scripts\skill_health_report.py
 Copy this repository folder into your Codex skills directory:
 
 ```powershell
-Copy-Item -Recurse . "$env:USERPROFILE\.codex\skills\skill-router-cartographer"
+Copy-Item -Recurse . "$env:USERPROFILE\.codex\skills\skill-auto-router"
 ```
+
+Existing installs under `skill-router-cartographer` still work as a legacy folder name, but new installs should use `skill-auto-router`.
 
 Restart Codex after installing.
 
@@ -56,7 +67,7 @@ python .\scripts\onboarding_check.py --project D:\path\to\project --host all --s
 If it reports missing guidance, ask the user before applying any change:
 
 ```text
-Setup Notice: skill-router-cartographer is installed, but this project/user profile does not yet ask agents to route work through installed skills.
+Setup Notice: skill-auto-router is installed, but this project/user profile does not yet ask agents to route work through installed skills.
 Why: without a short instruction block, the skill may be installed but rarely triggered.
 Recommended: add it to the project instruction file first so it only affects this workspace. Add it globally only if you want skill routing across all projects on this machine.
 Apply project-level guidance, global guidance, both, or skip?
@@ -102,6 +113,8 @@ Record feedback after a task:
 python .\scripts\record_trace.py --task "short task summary" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity warning --notice-shown --note "short non-sensitive note"
 ```
 
+Use `--required` for skills that must be used, and `--optional` for candidates. Do not write placeholder values such as `none` into `--missed`; leave it empty.
+
 Summarize feedback:
 
 ```powershell
@@ -111,7 +124,7 @@ python .\scripts\summarize_traces.py
 Create a health report:
 
 ```powershell
-python .\scripts\skill_health_report.py
+python .\scripts\skill_health_report.py --project D:\path\to\project --host codex --scope project
 ```
 
 Suggest a project instruction patch:
@@ -178,12 +191,17 @@ Correction: switching from market-research only to market-research + deep-resear
 
 `skill_health_report.py` writes `skill-health-report.md` next to the trace files. It highlights:
 
+- confidence level based on sample size and trace quality
+- invalid or polluted trace rows
 - repeated missed skills
 - overused skills
 - conflict clusters
 - missing user-facing notices
 - corrections taken
+- onboarding state for project/user instructions
 - project-instruction update recommendations
+
+The report is a routing diagnostic, not an exact accuracy score. `Recommended Candidates Not Used` means "suggested but not necessarily required"; use `Required But Unused` and `Repeated Misses` for stronger failure signals.
 
 ## License
 

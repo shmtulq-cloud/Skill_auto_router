@@ -8,6 +8,13 @@ import re
 from collections import Counter, defaultdict
 
 
+ROUTER_CANONICAL_ID = "skill-auto-router"
+ROUTER_DISPLAY_NAME = "Skill Auto Router"
+ROUTER_REPO_SLUG = "Skill_auto_router"
+ROUTER_LEGACY_ID = "skill-router-cartographer"
+TRACE_SCHEMA_VERSION = 2
+
+
 TOPIC_KEYWORDS: dict[str, list[str]] = {
     "research": ["research", "market", "source", "citation", "competitive", "intelligence", "deep"],
     "product": ["product", "prd", "spec", "spec-in", "capability", "roadmap", "requirements"],
@@ -37,10 +44,50 @@ CHINESE_PHRASES = [
     "公众号", "微信", "文章", "生图", "配图", "图片", "插图", "画图", "绘图",
     "封面", "主视觉", "标题图", "横版", "竖版", "海报", "视觉", "分镜",
     "小红书", "朋友圈", "草稿箱",
+    "技能路由", "路由器", "路由健康", "健康报告", "健康状态", "安装状态",
     "代码", "代码库", "代码审核", "代码审查", "代码索引", "知识图谱", "架构图",
     "模块关系", "调用图", "依赖图", "增量审查", "增量审核", "全量阅读", "全量扫描",
     "接手项目", "理解代码", "项目记忆", "架构记忆", "踩坑记录",
 ]
+
+PLACEHOLDER_LIST_VALUES = {
+    "",
+    "-",
+    "none",
+    "n/a",
+    "na",
+    "nil",
+    "null",
+    "not applicable",
+    "no",
+    "无",
+    "没有",
+    "无遗漏",
+    "无需",
+}
+
+STATUS_SUFFIXES = {
+    "pending",
+    "planned",
+    "todo",
+    "blocked",
+    "later",
+    "deferred",
+    "maybe",
+}
+
+SKILL_ALIASES = {
+    "skills_auto_router": ROUTER_CANONICAL_ID,
+    "skill_auto_router": ROUTER_CANONICAL_ID,
+    "skills-auto-router": ROUTER_CANONICAL_ID,
+    "skill-auto-router": ROUTER_CANONICAL_ID,
+    "auto skill router": ROUTER_CANONICAL_ID,
+    "skill auto router": ROUTER_CANONICAL_ID,
+    "skill-router-cartographer": ROUTER_CANONICAL_ID,
+    "skill router cartographer": ROUTER_CANONICAL_ID,
+    "skill-router": ROUTER_CANONICAL_ID,
+    "skill router": ROUTER_CANONICAL_ID,
+}
 
 SKIP_SCAN_PARTS = {
     ".git",
@@ -77,6 +124,16 @@ def default_skills_dir() -> Path:
 
 def default_out_dir() -> Path:
     return codex_home() / "skill-router"
+
+
+def router_identity() -> dict[str, object]:
+    return {
+        "canonical_skill_id": ROUTER_CANONICAL_ID,
+        "display_name": ROUTER_DISPLAY_NAME,
+        "repo_slug": ROUTER_REPO_SLUG,
+        "legacy_skill_id": ROUTER_LEGACY_ID,
+        "aliases": sorted(SKILL_ALIASES),
+    }
 
 
 def parse_frontmatter(text: str) -> dict[str, str]:
@@ -132,6 +189,89 @@ def tokenize(text: str) -> list[str]:
     tokens = re.findall(r"[a-zA-Z][a-zA-Z0-9_+-]{2,}|[\u4e00-\u9fff]{2,}", lowered)
     tokens.extend(phrase for phrase in CHINESE_PHRASES if phrase in text)
     return [t for t in tokens if t not in STOPWORDS]
+
+
+def raw_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",")]
+    if isinstance(value, list):
+        return [str(item).strip() for item in value]
+    return [str(value).strip()]
+
+
+def normalize_skill_item(value: object, known_names: set[str] | None = None) -> tuple[str | None, str | None]:
+    """Return a clean skill name plus an optional data-quality note."""
+
+    text = str(value).strip().strip("`").strip('"').strip("'")
+    text = re.sub(r"\s+", " ", text)
+    key = text.lower()
+    if key == ROUTER_CANONICAL_ID:
+        return key, None
+    if key in PLACEHOLDER_LIST_VALUES:
+        return None, f"placeholder:{text or '<empty>'}"
+    if key in SKILL_ALIASES:
+        return SKILL_ALIASES[key], f"alias:{text}->{SKILL_ALIASES[key]}"
+
+    known_names = known_names or set()
+    if known_names and key in known_names:
+        return key, None
+
+    parts = key.split()
+    if len(parts) > 1:
+        if parts[-1] in STATUS_SUFFIXES:
+            base = " ".join(parts[:-1])
+            if not known_names or base in known_names or "-" in base:
+                normalized_base = SKILL_ALIASES.get(base, base)
+                return normalized_base, f"status-suffix:{text}->{normalized_base} ({parts[-1]})"
+        first = parts[0]
+        if known_names and first in known_names:
+            normalized_first = SKILL_ALIASES.get(first, first)
+            return normalized_first, f"extra-words:{text}->{normalized_first}"
+        if "-" in first or "_" in first:
+            candidate = first.replace("_", "-")
+            normalized_candidate = SKILL_ALIASES.get(candidate, candidate)
+            return normalized_candidate, f"extra-words:{text}->{normalized_candidate}"
+        return None, f"non-canonical:{text}"
+
+    if not key:
+        return None, "placeholder:<empty>"
+    return key, None
+
+
+def clean_skill_list(value: object, known_names: set[str] | None = None) -> tuple[list[str], list[str]]:
+    cleaned: list[str] = []
+    notes: list[str] = []
+    seen: set[str] = set()
+    for item in raw_list(value):
+        name, note = normalize_skill_item(item, known_names)
+        if note:
+            notes.append(note)
+        if name and name not in seen:
+            seen.add(name)
+            cleaned.append(name)
+    return cleaned, notes
+
+
+def load_trace_events(path: Path) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    if not path.exists():
+        return [], []
+    events: list[dict[str, object]] = []
+    invalid: list[dict[str, object]] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8-sig", errors="replace").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as exc:
+            invalid.append({"line": line_number, "error": exc.msg})
+            continue
+        if isinstance(event, dict):
+            events.append(event)
+        else:
+            invalid.append({"line": line_number, "error": "JSON value is not an object"})
+    return events, invalid
 
 
 def classify(name: str, description: str) -> list[str]:
@@ -273,3 +413,15 @@ def load_map(path: Path) -> list[SkillRecord]:
         item.setdefault("topics", classify(name, description))
         records.append(SkillRecord(**item))
     return records
+
+
+def load_known_skill_names(out_dir: Path) -> set[str]:
+    map_path = out_dir.expanduser().resolve() / "skill-map.json"
+    names = {ROUTER_CANONICAL_ID, ROUTER_LEGACY_ID}
+    if not map_path.exists():
+        return names
+    try:
+        names.update(record.name.lower() for record in load_map(map_path))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return names
+    return names

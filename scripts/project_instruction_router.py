@@ -41,7 +41,7 @@ Skill Conflict Notice: <skill-a> conflicts with <skill-b>; chosen order: <primar
 
 If a verification skill was missed before claiming completion, stop and verify or clearly say verification could not be completed. If the same missed skill appears repeatedly, suggest updating these project instructions.
 
-Use `skill-router-cartographer` when skill choice is unclear, after installing new skills, or when this project's instructions need an updated skill route map. Use `ecc-guide` or `using-superpowers` as fallback routers for their ecosystems.
+Use `skill-auto-router` when skill choice is unclear, after installing new skills, or when this project's instructions need an updated skill route map. Legacy name: `skill-router-cartographer`. Use `ecc-guide` or `using-superpowers` as fallback routers for their ecosystems.
 
 Default routing:
 - Research, competitive analysis, and cited reports: `market-research`, `deep-research`, `research-ops`.
@@ -74,7 +74,7 @@ def upsert_block(old: str, block: str) -> tuple[str, bool]:
         end = old.index(END, start) + len(END)
         new = old[:start].rstrip() + "\n\n" + block.rstrip() + "\n\n" + old[end:].lstrip()
         return new, True
-    if "skill-router-cartographer" in old:
+    if "skill-auto-router" in old or "skill-router-cartographer" in old:
         return old, False
     if old.strip():
         return old.rstrip() + "\n\n" + block + "\n", True

@@ -5,7 +5,17 @@ from pathlib import Path
 import json
 
 from host_profiles import known_hosts, profiles_for, skill_roots_for
-from skill_router_common import default_out_dir, default_skills_dir, load_map, scan_skills, tokenize, write_map
+from skill_router_common import (
+    ROUTER_CANONICAL_ID,
+    SKILL_ALIASES,
+    default_out_dir,
+    default_skills_dir,
+    load_map,
+    normalize_skill_item,
+    scan_skills,
+    tokenize,
+    write_map,
+)
 
 
 VERIFICATION_HINTS = {
@@ -17,6 +27,18 @@ VERIFICATION_HINTS = {
 }
 
 CURATED_BOOSTS = [
+    (ROUTER_CANONICAL_ID, ["skill", "auto", "router"], 64, "curated: public project name"),
+    (ROUTER_CANONICAL_ID, ["skill_auto_router"], 64, "curated: repository slug"),
+    (ROUTER_CANONICAL_ID, ["skills_auto_router"], 60, "curated: router alias"),
+    (ROUTER_CANONICAL_ID, ["skill_auto_router"], 60, "curated: router alias"),
+    (ROUTER_CANONICAL_ID, ["skill-auto-router"], 60, "curated: router alias"),
+    (ROUTER_CANONICAL_ID, ["skills-auto-router"], 60, "curated: router alias"),
+    (ROUTER_CANONICAL_ID, ["skill", "router"], 42, "curated: skill routing"),
+    (ROUTER_CANONICAL_ID, ["auto", "router"], 42, "curated: auto skill router"),
+    (ROUTER_CANONICAL_ID, ["健康报告"], 40, "curated: router health report"),
+    (ROUTER_CANONICAL_ID, ["健康状态"], 40, "curated: router health status"),
+    (ROUTER_CANONICAL_ID, ["路由健康"], 40, "curated: router health"),
+    (ROUTER_CANONICAL_ID, ["技能路由"], 40, "curated: skill routing"),
     ("market-research", ["market", "research"], 28, "curated: market research"),
     ("deep-research", ["research"], 18, "curated: deep/cited research"),
     ("deep-research", ["cited"], 12, "curated: citations requested"),
@@ -126,6 +148,7 @@ def score_skill(
     score = 0
     reasons: list[str] = []
     name = skill.name.lower()
+    canonical_name = SKILL_ALIASES.get(name, name)
     description = skill.description.lower()
     keywords = set(skill.keywords)
     raw_query_tokens = raw_query_tokens or query_tokens
@@ -150,7 +173,7 @@ def score_skill(
             score += min(8, len(query_tokens & trigger_tokens) * 2)
 
     for skill_name, terms, boost, reason in CURATED_BOOSTS:
-        if skill.name == skill_name and all(term in raw_query_tokens or term in query_text for term in terms):
+        if canonical_name == skill_name and all(term in raw_query_tokens or term in query_text for term in terms):
             score += boost
             reasons.append(reason)
 
@@ -210,7 +233,7 @@ def main() -> int:
     for skill in records:
         score, reasons = score_skill(query_tokens, query_text, skill, raw_query_tokens)
         if score > 0:
-            key = skill.name.lower()
+            key = normalize_skill_item(skill.name)[0] or skill.name.lower()
             item = {"skill": skill, "score": score, "reasons": reasons}
             if key not in ranked_by_name or score > ranked_by_name[key]["score"]:
                 ranked_by_name[key] = item
@@ -218,10 +241,13 @@ def main() -> int:
     ranked.sort(key=lambda item: (-item["score"], item["skill"].name.lower()))
     top = ranked[: args.limit]
 
-    primary = top[0]["skill"].name if top else None
-    verification = next((item["skill"].name for item in top if item["skill"].name in VERIFICATION_HINTS), None)
+    def route_name(name: str) -> str:
+        return normalize_skill_item(name)[0] or name
+
+    primary = route_name(top[0]["skill"].name) if top else None
+    verification = next((route_name(item["skill"].name) for item in top if route_name(item["skill"].name) in VERIFICATION_HINTS), None)
     if verification is None:
-        verification = next((item["skill"].name for item in ranked if item["skill"].name in VERIFICATION_HINTS), None)
+        verification = next((route_name(item["skill"].name) for item in ranked if route_name(item["skill"].name) in VERIFICATION_HINTS), None)
 
     payload = {
         "task": " ".join(args.task),
@@ -229,7 +255,8 @@ def main() -> int:
         "verification": verification,
         "recommended": [
             {
-                "name": item["skill"].name,
+                "name": route_name(item["skill"].name),
+                "source_name": item["skill"].name,
                 "folder": item["skill"].folder,
                 "score": item["score"],
                 "topics": item["skill"].topics,

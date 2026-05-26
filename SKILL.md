@@ -1,11 +1,20 @@
 ---
-name: skill-router-cartographer
-description: Use before substantial work when installed skills should be selected, audited, mapped, reflected into project instructions, or reviewed for routing mistakes. Scans local Codex-compatible skills, extracts descriptions/triggers/scenarios/overlaps, routes the current task to a short list of best-fit skills, shows visible skill usage/conflict/correction notices, records local feedback traces, and safely suggests or applies project-instruction guidance.
+name: skill-auto-router
+description: Also known as Skill Auto Router, Skill_auto_router, or legacy skill-router-cartographer. Use before substantial work when installed skills should be selected, audited, mapped, reflected into project instructions, or reviewed for routing mistakes. Scans local Codex-compatible skills, extracts descriptions/triggers/scenarios/overlaps, routes the current task to a short list of best-fit skills, shows visible skill usage/conflict/correction notices, records local feedback traces, and safely suggests or applies project-instruction guidance.
 metadata:
   short-description: Route work to installed skills
 ---
 
-# Skill Router Cartographer
+# Skill Auto Router
+
+Name policy:
+
+- Public name: `Skill Auto Router`.
+- Repository slug: `Skill_auto_router`.
+- Canonical skill id in traces and instructions: `skill-auto-router`.
+- Legacy alias: `skill-router-cartographer`.
+
+Normalize old aliases to `skill-auto-router` in feedback traces so health reports do not split the same skill into multiple names.
 
 Use this skill as a lightweight router before substantial work, especially when many skills are installed or when the user asks why a skill did or did not trigger. It can be used from Codex, Claude Code, Kiro, Antigravity, OpenCode, OpenClaw, Hermes, and other agents that can read Markdown instruction files.
 
@@ -33,7 +42,7 @@ If guidance is missing, show the user why this matters and ask before changing a
 Use this exact prompt shape:
 
 ```text
-Setup Notice: skill-router-cartographer is installed, but this project/user profile does not yet ask agents to route work through installed skills.
+Setup Notice: skill-auto-router is installed, but this project/user profile does not yet ask agents to route work through installed skills.
 Why: without a short instruction block, the skill may be installed but rarely triggered.
 Recommended: add it to the project instruction file first so it only affects this workspace. Add it globally only if you want skill routing across all projects on this machine.
 Apply project-level guidance, global guidance, both, or skip?
@@ -111,6 +120,8 @@ When the user gives feedback about skill use, or when a task clearly reveals a m
 python scripts/record_trace.py --task "<short summary>" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity warning --notice-shown --note "<short non-sensitive note>"
 ```
 
+Use `--required` for skills that were mandatory and `--optional` for candidates. Leave empty lists empty; do not record `none`, `n/a`, or status phrases inside skill-name fields. Put route state in `--status`, for example `--status pending`.
+
 Use `fit` values:
 
 - `good` - route matched the task.
@@ -127,8 +138,10 @@ python scripts/summarize_traces.py
 Create a health report when the user asks how routing is performing, when many skills appear to overlap, or after several routing corrections:
 
 ```bash
-python scripts/skill_health_report.py
+python scripts/skill_health_report.py --project <path> --host codex --scope project
 ```
+
+Health reports include sample-size confidence, invalid JSONL rows, normalized trace pollution, onboarding status, repeated misses, overuse patterns, conflicts, and instruction recommendations. Treat them as diagnostic evidence, not a statistically valid accuracy score.
 
 This writes:
 

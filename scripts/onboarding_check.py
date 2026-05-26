@@ -12,7 +12,7 @@ def is_configured(path: Path) -> bool:
     if not path.exists():
         return False
     text = path.read_text(encoding="utf-8", errors="replace")
-    return BEGIN in text or "skill-router-cartographer" in text
+    return BEGIN in text or "skill-auto-router" in text or "skill-router-cartographer" in text
 
 
 def check_target(host: str, label: str, root: Path) -> dict[str, object]:
