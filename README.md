@@ -13,11 +13,15 @@ Old aliases are normalized to `skill-auto-router` in feedback traces so health r
 
 It scans local skills, builds a route map, recommends skills for the current task, and can add a concise routing block to project instructions.
 It does not bundle or depend on the author's personal skill inventory; each machine is routed against its own installed `SKILL.md` files.
+It is designed for ordinary-language triggering: users should not need to remember or `@` a specific skill name.
+
+For non-coders, the intended usage is simple: say what you want in everyday words. The router should translate "查资料", "写公众号", "做图", "做个网站", "修报错", "看不懂项目", "上传 GitHub", "整理 PDF", or "做商业验证" into the right skill route.
 
 It also encourages always-visible routing:
 
 ```text
 Skill Route: <primary skill> + <supporting skills> + <verification skill>
+Route Level: none | light | workflow | heavy
 Why: <one short reason>
 ```
 
@@ -45,6 +49,38 @@ python .\scripts\skill_health_report.py
 - Records visible notices, corrections, and skill conflicts.
 - Summarizes feedback trends and health issues.
 - Suggests or applies safe project instruction guidance.
+
+## Easiest Trigger Pattern
+
+For non-coders, use this one sentence shape:
+
+```text
+帮我 + 你想完成的目标 + 你想要的结果
+```
+
+Examples:
+
+- `帮我查一下菲律宾 HVAC 市场，做竞品分析并找来源`
+- `帮我把这篇公众号改得真人感一点，画重点并排版`
+- `帮我做一张公众号封面图和插图`
+- `这个项目跑不起来，帮我修报错`
+- `我看不懂这个代码项目，先帮我做项目梳理和代码地图`
+- `帮我上传 GitHub 并开源，顺便提交代码`
+- `帮我整理这个 PDF 成资料包，存在本地以后方便研究`
+- `我们一起做商业验证，构思 MVP，看看怎么试卖`
+
+## No-Skill Gate
+
+The router should be useful without becoming heavy-handed. Before opening any skill, it now classifies the task:
+
+- `none` - answer directly; skill overhead is not worth it.
+- `light` - one lightweight skill may help.
+- `workflow` - use the selected workflow skill.
+- `heavy` - multi-step work may need supporting and verification skills.
+
+Typical `none` tasks include single-sentence rewriting, basic concept explanation, short keyword brainstorming, translation, and lightweight naming. Use a skill when the user asks for source verification, files, code, tools, research, a concrete deliverable, or a multi-step workflow.
+
+For broad business-building prompts such as "商业验证 + MVP + 试卖", prefer `opc-orchestrator` as the coordinator. Use narrower OPC stage skills, such as `opc-mvp-designer`, only when the user is clearly asking for that stage.
 
 ## Install
 
@@ -107,6 +143,12 @@ Route a codebase knowledge workflow:
 python .\scripts\route_task.py "审核已有代码并生成代码索引，避免每次全量阅读代码"
 ```
 
+Route a business-building workflow:
+
+```powershell
+python .\scripts\route_task.py "我们一起做商业验证，构思 MVP，看看怎么试卖和形成转化闭环"
+```
+
 Record feedback after a task:
 
 ```powershell
@@ -125,6 +167,12 @@ Create a health report:
 
 ```powershell
 python .\scripts\skill_health_report.py --project D:\path\to\project --host codex --scope project
+```
+
+Run router smoke tests:
+
+```powershell
+python .\scripts\router_smoke_tests.py
 ```
 
 Suggest a project instruction patch:

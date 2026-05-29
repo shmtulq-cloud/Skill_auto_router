@@ -18,16 +18,24 @@ Normalize old aliases to `skill-auto-router` in feedback traces so health report
 
 Use this skill as a lightweight router before substantial work, especially when many skills are installed or when the user asks why a skill did or did not trigger. It can be used from Codex, Claude Code, Kiro, Antigravity, OpenCode, OpenClaw, Hermes, and other agents that can read Markdown instruction files.
 
+Do not wait for the user to explicitly mention or `@` a skill. Infer likely skills from the user's intent, especially when the user describes a workflow in ordinary language.
+
+Beginner-friendly trigger mode: assume the user may not know coding or skill names. Convert plain-language goals into skill choices. "查一下/研究一下/找资料" means research. "写文章/公众号/润色/排版" means writing/content. "做图/封面/PPT/视觉/UI" means design/media. "做个网站/修报错/跑不起来" means coding/debugging. "看不懂项目/代码地图/审查代码" means codebase onboarding/review. "上传 GitHub/提交/PR/issue" means Git/GitHub workflow. "整理表格/数据分析/PDF/网页转资料" means data/document/local-corpus workflow.
+
+No-skill gate: before routing, decide whether opening a skill is worth the overhead. Do not use a skill for simple direct-answer tasks such as single-sentence rewriting, basic concept explanation, short keyword brainstorming, translation, or lightweight naming unless the user asks for a workflow, source verification, files, code, tools, or a concrete deliverable.
+
 ## Workflow
 
 1. Understand the user's task.
-2. Refresh the local skill map when missing, stale, or after new skill installs.
-3. Route the task to:
+2. Decide the route level: `none`, `light`, `workflow`, or `heavy`.
+3. If route level is `none`, answer directly and show why no skill is needed.
+4. Refresh the local skill map when missing, stale, or after new skill installs.
+5. Route the task to:
    - one primary workflow skill
    - zero to three supporting domain/tool skills
    - one verification or review skill when useful
-4. Load only the selected skills' full `SKILL.md` files.
-5. If project instructions need routing guidance, propose a patch first. Apply only after user approval.
+6. Load only the selected skills' full `SKILL.md` files.
+7. If project instructions need routing guidance, propose a patch first. Apply only after user approval.
 
 ## Post-Install Onboarding
 
@@ -71,6 +79,7 @@ For every non-trivial response, show a compact skill-routing note before doing t
 
 ```text
 Skill Route: <primary skill> + <supporting skills> + <verification skill>
+Route Level: none | light | workflow | heavy
 Why: <one short reason>
 ```
 
@@ -141,7 +150,7 @@ Create a health report when the user asks how routing is performing, when many s
 python scripts/skill_health_report.py --project <path> --host codex --scope project
 ```
 
-Health reports include sample-size confidence, invalid JSONL rows, normalized trace pollution, onboarding status, repeated misses, overuse patterns, conflicts, and instruction recommendations. Treat them as diagnostic evidence, not a statistically valid accuracy score.
+Health reports include sample-size confidence, invalid JSONL rows, normalized trace pollution, onboarding status, route-level distribution, repeated misses, overuse patterns, conflicts, and instruction recommendations. Treat them as diagnostic evidence, not a statistically valid accuracy score.
 
 This writes:
 
@@ -236,6 +245,10 @@ By default scripts write private local outputs to:
 
 - Market research, competitive intelligence, cited reports: `market-research`, `deep-research`, `research-ops`.
 - Product definition, spec-in, PRD, implementation packages: `spec-driven-vibe-coding`, `product-lens`, `product-capability`.
+- Business building, 一人企业, 一人公司, side business, personal commercialization, business validation, MVP validation, conversion loops, asset ops, and operating reviews: route to the OPC skill family. Prefer `opc-orchestrator` for broad or first-time workflows; use a specific OPC stage skill only when the user clearly asks for that stage.
+- Writing, WeChat drafts, article shaping, copywriting, and polishing: `article-writing`, `writing-shape`, `content-engine`, `copywriting`, and WeChat-specific skills when installed.
+- Local source capture, PDFs, webpages, and reusable research packs: `anything-to-local-data`, document/PDF skills, and data-report skills.
+- GitHub, commits, branches, issues, PRs, and open-source publishing: `git-workflow`, `github-ops`, `opensource-pipeline`.
 - Design, prototypes, slides, artifacts, visual direction: Open Design skills such as `creative-director`, `design-brief`, `artifacts-builder`.
 - Codebase context and repo packing: `repomix`, `repo-scan`, `codebase-onboarding`.
 - Reusable code review memory, code indexes, or "avoid reading the whole repo every time": route to locally installed codebase scanning, onboarding, knowledge/memory, note-taking, review, and verification skills. Do not assume those exact skills exist on every machine.

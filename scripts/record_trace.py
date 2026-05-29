@@ -11,6 +11,7 @@ from skill_router_common import TRACE_SCHEMA_VERSION, clean_skill_list, default_
 
 VALID_FIT = {"good", "partial", "wrong", "unknown"}
 VALID_SEVERITY = {"info", "warning", "correction", "blocker"}
+VALID_ROUTE_LEVEL = {"none", "light", "workflow", "heavy", "unknown"}
 
 
 def split_csv(value: str | None) -> tuple[list[str], list[str]]:
@@ -52,6 +53,7 @@ def main() -> int:
     parser.add_argument("--missed", default="", help="Comma-separated skills that should have been used but were missed.")
     parser.add_argument("--overused", default="", help="Comma-separated skills that were used but probably unnecessary.")
     parser.add_argument("--fit", default="unknown", choices=sorted(VALID_FIT), help="Overall fit: good, partial, wrong, unknown.")
+    parser.add_argument("--route-level", default="unknown", choices=sorted(VALID_ROUTE_LEVEL), help="Route weight: none, light, workflow, heavy, or unknown.")
     parser.add_argument("--severity", choices=sorted(VALID_SEVERITY), help="User-facing severity. Defaults to an inferred value.")
     parser.add_argument("--notice-shown", action="store_true", help="Set when a visible notice was shown to the user.")
     parser.add_argument("--correction-taken", action="store_true", help="Set when the agent corrected the route or behavior during the task.")
@@ -93,6 +95,7 @@ def main() -> int:
         "used": used,
         "missed": missed,
         "overused": overused,
+        "route_level": args.route_level,
         "fit": args.fit,
         "severity": severity,
         "notice_shown": bool(args.notice_shown),

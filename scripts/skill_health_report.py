@@ -35,6 +35,7 @@ def main() -> int:
     conflicts = Counter()
     conflict_clusters = Counter()
     severity_counts = Counter()
+    route_levels = Counter()
     patch_suggestions = Counter()
     data_quality = Counter()
     notices_required = 0
@@ -53,6 +54,7 @@ def main() -> int:
         task = str(event.get("task", "")).strip()
         severity = str(event.get("severity", "info"))
         severity_counts[severity] += 1
+        route_levels[str(event.get("route_level", "unknown") or "unknown")] += 1
 
         event_missed, notes = clean_skill_list(event.get("missed"), known_names)
         data_quality.update(notes)
@@ -113,8 +115,21 @@ def main() -> int:
         if count >= 1:
             instruction_recommendations.append(f"Suggested instruction patch ({count}x): {patch}")
 
+    repeated_missed = any(count >= args.threshold for count in missed.values())
+    repeated_overused = any(count >= args.threshold for count in overused.values())
+    repeated_conflicts = any(count >= args.threshold for count in conflicts.values())
+    repeated_conflict_clusters = any(count >= 2 for count in conflict_clusters.values())
+
     health = "good"
-    if notices_missing or missed or conflicts or invalid_lines or onboarding_missing:
+    if (
+        notices_missing
+        or invalid_lines
+        or onboarding_missing
+        or repeated_missed
+        or repeated_overused
+        or repeated_conflicts
+        or repeated_conflict_clusters
+    ):
         health = "needs_attention"
     if severity_counts.get("blocker", 0):
         health = "blocked"
@@ -132,6 +147,11 @@ def main() -> int:
         "health": health,
         "confidence": confidence,
         "severity_counts": dict(severity_counts),
+        "route_levels": dict(route_levels),
+        "attention_thresholds": {
+            "skill_count_threshold": args.threshold,
+            "conflict_cluster_threshold": 2,
+        },
         "notice_coverage": {
             "required": notices_required,
             "missing": notices_missing,
@@ -161,6 +181,7 @@ def main() -> int:
         f"Invalid JSONL lines: {len(invalid_lines)}",
         f"Health: `{health}`",
         f"Confidence: `{confidence}`",
+        f"Attention threshold: repeated skill signals >= {args.threshold}; repeated conflict clusters >= 2",
         "",
         "> Confidence is about sample size and data quality. This report is a routing diagnostic, not a statistically valid accuracy score.",
         "",
@@ -177,6 +198,8 @@ def main() -> int:
     lines.extend([f"- `{item['name']}`: {item['count']}" for item in report["repeated_missed"]] or ["- none"])
     lines.extend(["", "## Overuse Patterns", ""])
     lines.extend([f"- `{item['name']}`: {item['count']}" for item in report["repeated_overused"]] or ["- none"])
+    lines.extend(["", "## Route Levels", ""])
+    lines.extend([f"- `{name}`: {count}" for name, count in route_levels.most_common()] or ["- none"])
     lines.extend(["", "## Conflict Clusters", ""])
     lines.extend([f"- `{item['name']}`: {item['count']}" for item in report["conflict_clusters"]] or ["- none"])
     lines.extend(["", "## Data Quality", ""])

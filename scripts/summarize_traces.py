@@ -27,6 +27,7 @@ def main() -> int:
     missed = Counter()
     overused = Counter()
     severities = Counter()
+    route_levels = Counter()
     conflicts = Counter()
     conflict_clusters = Counter()
     recommended_candidates_unused = Counter()
@@ -59,6 +60,7 @@ def main() -> int:
         over = clean("overused")
         conflict = clean("conflicts")
         severity = str(event.get("severity", "info"))
+        route_levels[str(event.get("route_level", "unknown") or "unknown")] += 1
         recommended.update(rec)
         required.update(req)
         optional.update(opt)
@@ -101,6 +103,7 @@ def main() -> int:
         "invalid_json_lines": invalid_lines,
         "fit_counts": dict(fits),
         "severity_counts": dict(severities),
+        "route_level_counts": dict(route_levels),
         "notice_coverage": {
             "required": notices_required,
             "shown": notices_shown,
@@ -142,6 +145,12 @@ def main() -> int:
     else:
         for severity, count in severities.most_common():
             lines.append(f"- `{severity}`: {count}")
+    lines.extend(["", "## Route Levels", ""])
+    if not route_levels:
+        lines.append("- none")
+    else:
+        for level, count in route_levels.most_common():
+            lines.append(f"- `{level}`: {count}")
     lines.extend([
         "",
         "## Notice Coverage",

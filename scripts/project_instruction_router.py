@@ -16,14 +16,21 @@ ROUTING_BLOCK_TEMPLATE = """\
 
 Before substantial work, check whether an installed skill fits the task. If a relevant skill exists, use it or briefly explain why it is not needed.
 
+Do not wait for the user to explicitly mention or @ a skill. Infer likely skills from the user's intent and route proactively.
+
+Beginner-friendly trigger mode: the user should not need to remember skill names. Treat ordinary phrases as routing intent. Examples: "查一下/研究一下/找资料" means research; "写文章/公众号/润色/排版" means writing/content; "做图/封面/PPT/视觉/UI" means design/media; "做个网站/修报错/跑不起来" means coding/debugging; "看不懂项目/代码地图/审查代码" means codebase onboarding/review; "上传 GitHub/提交/PR/issue" means Git/GitHub workflow; "整理表格/数据分析/PDF/网页转资料" means data/document/local-corpus workflow. Ask at most one plain-language question when routing is genuinely ambiguous.
+
 For every non-trivial task, show a compact route note before doing the work:
 
 ```text
 Skill Route: <primary skill> + <supporting skills> + <verification skill>
+Route Level: none | light | workflow | heavy
 Why: <one short reason>
 ```
 
 If no skill is useful, write `Skill Route: none` with a short reason.
+
+No-skill gate: before routing, decide whether opening a skill is worth the overhead. Do not use a skill for simple direct-answer tasks such as single-sentence rewriting, basic concept explanation, short keyword brainstorming, translation, or lightweight naming unless the user asks for a workflow, source verification, files, code, tools, or a concrete deliverable.
 
 At completion, include a brief `Skill Usage Review` stating which skills were used, whether the fit was correct, and any missed or next-step skill.
 
@@ -46,6 +53,10 @@ Use `skill-auto-router` when skill choice is unclear, after installing new skill
 Default routing:
 - Research, competitive analysis, and cited reports: `market-research`, `deep-research`, `research-ops`.
 - Product definition, PRD, spec-in, and implementation packages: `spec-driven-vibe-coding`, `product-lens`, `product-capability`.
+- Business building, one-person company, side business, business validation, MVP validation, conversion loops, asset ops, and operating reviews: the OPC skill family. Prefer `opc-orchestrator` for broad or first-time workflows; use a specific OPC stage skill only when the user clearly asks for that stage.
+- Writing, WeChat drafts, article shaping, copywriting, and polishing: `article-writing`, `writing-shape`, `content-engine`, `copywriting`, and WeChat-specific skills when installed.
+- Local source capture, PDFs, webpages, and reusable research packs: `anything-to-local-data`, document/PDF skills, and data-report skills.
+- GitHub, commits, branches, issues, PRs, and open-source publishing: `git-workflow`, `github-ops`, `opensource-pipeline`.
 - Design, prototypes, slides, and visual direction: Open Design skills such as `creative-director`, `design-brief`, `artifacts-builder`.
 - Codebase context packing and onboarding: `repomix`, `repo-scan`, `codebase-onboarding`.
 - Reusable code review memory, code indexes, or avoiding repeated full-repo reads: route to locally installed codebase scanning, onboarding, knowledge/memory, note-taking, review, and verification skills. Do not assume those exact skills exist on every machine.
