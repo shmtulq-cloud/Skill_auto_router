@@ -8,6 +8,14 @@ from pathlib import Path
 from skill_router_common import clean_skill_list, default_out_dir, load_known_skill_names, load_trace_events, router_identity
 
 
+REVIEW_EVENT_TYPES = {"usage_review", "correction", "manual_feedback", "legacy_usage_review"}
+
+
+def event_type(event: dict[str, object]) -> str:
+    value = str(event.get("event_type", "") or "").strip()
+    return value or "legacy_usage_review"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Summarize local skill-routing feedback traces.")
     parser.add_argument("--out-dir", default=str(default_out_dir()))
@@ -18,8 +26,10 @@ def main() -> int:
     out_dir = Path(args.out_dir).expanduser().resolve()
     events, invalid_lines = load_trace_events(path)
     known_names = load_known_skill_names(out_dir)
+    reviews = [event for event in events if event_type(event) in REVIEW_EVENT_TYPES]
+    event_types = Counter(event_type(event) for event in events)
 
-    fits = Counter(str(event.get("fit", "unknown")) for event in events)
+    fits = Counter(str(event.get("fit", "unknown")) for event in reviews)
     recommended = Counter()
     required = Counter()
     optional = Counter()
@@ -40,7 +50,7 @@ def main() -> int:
 
     pair_stats: dict[str, Counter[str]] = defaultdict(Counter)
 
-    for event in events:
+    for event in reviews:
         normalization = event.get("normalization")
         if isinstance(normalization, dict):
             for notes in normalization.values():
@@ -100,6 +110,8 @@ def main() -> int:
         "trace_file": str(path),
         "router_identity": router_identity(),
         "events": len(events),
+        "review_events": len(reviews),
+        "event_type_counts": dict(event_types),
         "invalid_json_lines": invalid_lines,
         "fit_counts": dict(fits),
         "severity_counts": dict(severities),
@@ -132,11 +144,22 @@ def main() -> int:
         f"Trace file: `{path}`",
         f"Router identity: `{router_identity()['canonical_skill_id']}` ({router_identity()['display_name']})",
         f"Events: {len(events)}",
+        f"Review events analyzed: {len(reviews)}",
         f"Invalid JSONL lines: {len(invalid_lines)}",
+        "",
+        "## Event Types",
+        "",
+    ]
+    if not event_types:
+        lines.append("- none")
+    else:
+        for name, count in event_types.most_common():
+            lines.append(f"- `{name}`: {count}")
+    lines.extend([
         "",
         "## Fit Counts",
         "",
-    ]
+    ])
     for fit, count in fits.most_common():
         lines.append(f"- `{fit}`: {count}")
     lines.extend(["", "## Severity Counts", ""])

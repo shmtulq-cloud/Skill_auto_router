@@ -32,7 +32,18 @@ If no skill is useful, write `Skill Route: none` with a short reason.
 
 No-skill gate: before routing, decide whether opening a skill is worth the overhead. Do not use a skill for simple direct-answer tasks such as single-sentence rewriting, basic concept explanation, short keyword brainstorming, translation, or lightweight naming unless the user asks for a workflow, source verification, files, code, tools, or a concrete deliverable.
 
-At completion, include a brief `Skill Usage Review` stating which skills were used, whether the fit was correct, and any missed or next-step skill.
+Mid-task reroute checkpoint: during non-trivial work, re-check routing whenever the task changes phase or reveals a new deliverable, such as research, source verification, code/debugging, tests, visuals, document/data extraction, GitHub/open-source work, deployment, privacy/security review, or business/product workflow. Also reroute when the user corrects direction, a skill was missed, the agent gets stuck, or verification becomes necessary. Show:
+
+```text
+Skill Route Update: <old route> -> <new route>
+Route Level: none | light | workflow | heavy
+Why: <what changed>
+Action: <continue/add/replace/verify>
+```
+
+At completion, include a brief `Skill Usage Review` only when it adds useful accountability, such as after a correction, conflict, verification decision, or substantial workflow task.
+
+Trace discipline: default behavior is routing, not logging. Do not spend extra effort writing trace events during ordinary tasks. Only record `route_decision`, `correction`, or `usage_review` events when the user explicitly asks to audit routing telemetry, when maintaining the router, or when investigating repeated missed/overused/conflicting routes. Do not treat trace output as full skill-usage analytics.
 
 If skill routing quality affects the task, show a visible notice immediately:
 

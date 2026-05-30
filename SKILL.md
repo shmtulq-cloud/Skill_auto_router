@@ -90,13 +90,24 @@ Skill Route: none
 Why: task is trivial / no installed skill adds value
 ```
 
-At completion, include a short review when skills affected the work:
+During a non-trivial task, re-check routing whenever the work enters a materially new phase. Do not wait until the final review if the route has clearly changed. Show a compact update:
+
+```text
+Skill Route Update: <old route> -> <new route>
+Route Level: none | light | workflow | heavy
+Why: <what changed>
+Action: <continue/add/replace/verify>
+```
+
+Reroute checkpoints are required when the task shifts into research, source verification, code/debugging, tests, visuals, document/data extraction, GitHub/open-source work, deployment, privacy/security review, or business/product workflow. Also reroute when the user corrects the direction, a needed skill was missed, the agent gets stuck, or the work reveals a new deliverable.
+
+At completion, include a short visible review only when it adds useful accountability, such as after a correction, conflict, verification decision, or substantial workflow task:
 
 ```text
 Skill Usage Review: used <skills>; fit was <good/partial>; missed/next <skill or none>.
 ```
 
-Keep this brief. The visibility note should make routing auditable without turning every answer into a skill catalog.
+Keep this brief. The visibility note should make routing understandable without turning every answer into a skill catalog or a logging exercise.
 
 ## Usage Notices
 
@@ -121,13 +132,39 @@ Skill Conflict Notice: <skill-a> conflicts with <skill-b>; chosen order: <primar
 
 If a verification skill was missed before completion, stop and verify, or clearly state why verification cannot be completed. If the same missed skill appears three or more times in the feedback history, recommend updating project instructions.
 
-## Feedback Loop
+## Optional Diagnostics
 
-When the user gives feedback about skill use, or when a task clearly reveals a missed, overused, conflicting, or corrected skill route, record a compact local trace:
+Default behavior is routing, not logging. Do not spend extra model effort writing trace events during ordinary work. The core value of this skill is deciding whether to use a skill, which skill to use, and when not to use any skill.
+
+Trace files and health reports are optional diagnostics for debugging the router itself. They are useful when the user explicitly asks to audit routing behavior, when maintaining this skill, or when investigating repeated missed/overused/conflicting routes.
+
+Health reports are only meaningful if the trace pipeline is intentionally enabled. Do not treat `skill-trace.jsonl` as a hidden automatic counter for every skill invocation. If tracing is enabled, the intended flow is:
+
+1. At task start, record the route decision.
+2. During the task, re-check routing at phase changes and record a `correction` event when the route materially changes.
+3. At task completion, record the actual usage review with the same `route_id`.
+
+Record the route decision:
 
 ```bash
-python scripts/record_trace.py --task "<short summary>" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity warning --notice-shown --note "<short non-sensitive note>"
+python scripts/route_task.py "<short task summary>" --trace
 ```
+
+The command prints a `route_id`. Keep that id for mid-task corrections and the completion review.
+
+When a mid-task checkpoint changes the route, show `Skill Route Update` and record it as a correction:
+
+```bash
+python scripts/record_trace.py --event-type correction --route-id "<same route_id>" --task "<short summary>" --recommended "new-skill-a,new-skill-b" --used "skill-a" --missed "new-skill-a" --fit partial --severity correction --notice-shown --correction-taken --note "<short non-sensitive reason>"
+```
+
+When the user asks to audit skill use, or when you are intentionally debugging routing telemetry, record a compact local review:
+
+```bash
+python scripts/record_trace.py --event-type usage_review --route-id "<same route_id>" --task "<short summary>" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity warning --notice-shown --note "<short non-sensitive note>"
+```
+
+If no route decision was recorded, you may still record a `manual_feedback` event, but health reports must treat it as review-only evidence rather than real usage telemetry. Do not present optional trace output as full usage analytics.
 
 Use `--required` for skills that were mandatory and `--optional` for candidates. Leave empty lists empty; do not record `none`, `n/a`, or status phrases inside skill-name fields. Put route state in `--status`, for example `--status pending`.
 
@@ -144,13 +181,13 @@ Summarize feedback history:
 python scripts/summarize_traces.py
 ```
 
-Create a health report when the user asks how routing is performing, when many skills appear to overlap, or after several routing corrections:
+Create a health report only when the user asks how routing telemetry is performing, when maintaining this router, or after several recorded routing corrections:
 
 ```bash
 python scripts/skill_health_report.py --project <path> --host codex --scope project
 ```
 
-Health reports include sample-size confidence, invalid JSONL rows, normalized trace pollution, onboarding status, route-level distribution, repeated misses, overuse patterns, conflicts, and instruction recommendations. Treat them as diagnostic evidence, not a statistically valid accuracy score.
+Health reports include trace coverage, paired route decisions and completion reviews, sample-size confidence, invalid JSONL rows, normalized trace pollution, onboarding status, route-level distribution, repeated misses, overuse patterns, conflicts, and instruction recommendations. Treat them as optional diagnostic evidence, not product telemetry or a statistically valid accuracy score. If the report says `insufficient_data`, do not draw product conclusions from it.
 
 This writes:
 
@@ -190,6 +227,12 @@ Route a task:
 python scripts/route_task.py "make a cited Philippines HVAC spec-in market report"
 ```
 
+Route a task and record the route decision:
+
+```bash
+python scripts/route_task.py "make a cited Philippines HVAC spec-in market report" --trace
+```
+
 Route using another host's skill roots:
 
 ```bash
@@ -199,7 +242,7 @@ python scripts/route_task.py "debug a failing build" --host claude-code --refres
 Record routing feedback:
 
 ```bash
-python scripts/record_trace.py --task "HVAC market report" --recommended "spec-driven-vibe-coding,market-research" --used "market-research" --missed "verification-loop" --fit partial --severity warning --notice-shown
+python scripts/record_trace.py --event-type usage_review --route-id "<same route_id>" --task "HVAC market report" --recommended "spec-driven-vibe-coding,market-research" --used "market-research" --missed "verification-loop" --fit partial --severity warning --notice-shown
 ```
 
 Summarize routing feedback:
@@ -237,7 +280,7 @@ By default scripts write private local outputs to:
 - `skill-map.json` - machine-readable inventory.
 - `skill-roadmap.md` - human-readable route map.
 - `overlaps.md` - likely exact and topic-level overlaps.
-- `skill-trace.jsonl` - compact private feedback events.
+- `skill-trace.jsonl` - compact private route decisions and completion reviews.
 - `skill-trace-summary.md` - aggregate feedback summary.
 - `skill-health-report.md` - user-facing attention items, conflicts, and instruction recommendations.
 

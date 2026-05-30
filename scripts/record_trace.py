@@ -1,28 +1,21 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-import json
 from pathlib import Path
-import uuid
 
-from skill_router_common import TRACE_SCHEMA_VERSION, clean_skill_list, default_out_dir, router_identity
+from skill_router_common import append_trace_event, base_trace_event, clean_skill_list, default_out_dir, new_trace_id
 
 
 VALID_FIT = {"good", "partial", "wrong", "unknown"}
 VALID_SEVERITY = {"info", "warning", "correction", "blocker"}
 VALID_ROUTE_LEVEL = {"none", "light", "workflow", "heavy", "unknown"}
+VALID_EVENT_TYPE = {"route_decision", "usage_review", "correction", "manual_feedback"}
 
 
 def split_csv(value: str | None) -> tuple[list[str], list[str]]:
     if not value:
         return [], []
     return clean_skill_list(value)
-
-
-def trace_file(out_dir: Path) -> Path:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir / "skill-trace.jsonl"
 
 
 def infer_severity(
@@ -45,7 +38,13 @@ def infer_severity(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Record a local skill-routing feedback event.")
+    parser.add_argument("--event-type", default="usage_review", choices=sorted(VALID_EVENT_TYPE), help="Trace event type.")
     parser.add_argument("--task", required=True, help="Short task summary. Avoid private full prompts.")
+    parser.add_argument("--route-id", default="", help="Stable id linking route_decision and usage_review events.")
+    parser.add_argument("--new-route-id", action="store_true", help="Generate a route id when one is not supplied.")
+    parser.add_argument("--source", default="manual", help="Where this event came from, e.g. manual, agent_review, route_task.")
+    parser.add_argument("--project", default="", help="Optional project path or slug. Avoid private details if sharing traces.")
+    parser.add_argument("--host", default="", help="Optional host profile such as codex, claude-code, kiro.")
     parser.add_argument("--recommended", default="", help="Comma-separated recommended skill names.")
     parser.add_argument("--required", default="", help="Comma-separated skills that were required for this task.")
     parser.add_argument("--optional", default="", help="Comma-separated optional/candidate skills.")
@@ -83,11 +82,15 @@ def main() -> int:
     }
     normalization = {key: value for key, value in normalization.items() if value}
 
+    route_id = args.route_id.strip()
+    if args.new_route_id and not route_id:
+        route_id = new_trace_id()
+
     event = {
-        "trace_schema_version": TRACE_SCHEMA_VERSION,
-        "router_identity": router_identity(),
-        "id": str(uuid.uuid4()),
-        "ts": datetime.now(timezone.utc).isoformat(),
+        **base_trace_event(args.event_type, args.source.strip() or "manual"),
+        "route_id": route_id,
+        "project": args.project.strip()[:300],
+        "host": args.host.strip()[:100],
         "task": args.task.strip()[:500],
         "recommended": recommended,
         "required": required,
@@ -106,11 +109,11 @@ def main() -> int:
         "next_instruction_patch": args.next_instruction_patch.strip()[:1000],
         "note": args.note.strip()[:500],
     }
-    path = trace_file(Path(args.out_dir).expanduser().resolve())
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    path = append_trace_event(Path(args.out_dir), event)
     print(f"trace={path}")
     print(f"id={event['id']}")
+    if route_id:
+        print(f"route_id={route_id}")
     print(f"severity={severity}")
     if severity != "info" and not args.notice_shown:
         print("notice_needed=true")

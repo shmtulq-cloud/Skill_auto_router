@@ -31,13 +31,7 @@ and a short completion review:
 Skill Usage Review: used <skills>; fit was <good/partial>; missed/next <skill or none>.
 ```
 
-It can optionally record a local feedback loop so the route map improves over time:
-
-```powershell
-python .\scripts\record_trace.py --task "HVAC market report" --recommended "spec-driven-vibe-coding,market-research" --used "market-research" --missed "verification-loop" --fit partial --severity warning --notice-shown
-python .\scripts\summarize_traces.py
-python .\scripts\skill_health_report.py
-```
+Default behavior is routing, not logging. The skill should decide whether a task deserves a skill, select the smallest useful set, and skip skill overhead for simple work. Optional trace and health-report scripts remain available for debugging the router itself, but they are not full usage analytics and should not run during ordinary tasks unless the user explicitly wants routing telemetry.
 
 ## What It Does
 
@@ -45,7 +39,7 @@ python .\scripts\skill_health_report.py
 - Extracts names, descriptions, triggers, topics, and keywords.
 - Generates a local route map.
 - Ranks likely skills for a task.
-- Records optional local feedback about used/missed/overused skills.
+- Provides optional local diagnostics for route decisions, mid-task corrections, and completion reviews when tracing is explicitly enabled.
 - Records visible notices, corrections, and skill conflicts.
 - Summarizes feedback trends and health issues.
 - Suggests or applies safe project instruction guidance.
@@ -137,6 +131,25 @@ Route a task:
 python .\scripts\route_task.py "make a cited Philippines HVAC spec-in market report"
 ```
 
+Optionally record a route decision when debugging router telemetry:
+
+```powershell
+python .\scripts\route_task.py "make a cited Philippines HVAC spec-in market report" --trace
+```
+
+When the task changes phase, show a route update. Only record the correction with the same `route_id` when tracing is explicitly enabled:
+
+```text
+Skill Route Update: market-research -> market-research + deep-research + verification-loop
+Route Level: heavy
+Why: sourced claims and completion verification became required
+Action: add source verification before finishing
+```
+
+```powershell
+python .\scripts\record_trace.py --event-type correction --route-id "<same route_id>" --task "short task summary" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity correction --notice-shown --correction-taken --note "route changed after a mid-task checkpoint"
+```
+
 Route a codebase knowledge workflow:
 
 ```powershell
@@ -149,10 +162,10 @@ Route a business-building workflow:
 python .\scripts\route_task.py "我们一起做商业验证，构思 MVP，看看怎么试卖和形成转化闭环"
 ```
 
-Record feedback after a task:
+Optionally record the completion review after a traced diagnostic task:
 
 ```powershell
-python .\scripts\record_trace.py --task "short task summary" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity warning --notice-shown --note "short non-sensitive note"
+python .\scripts\record_trace.py --event-type usage_review --route-id "<same route_id>" --task "short task summary" --recommended "skill-a,skill-b" --used "skill-a" --missed "skill-b" --fit partial --severity warning --notice-shown --note "short non-sensitive note"
 ```
 
 Use `--required` for skills that must be used, and `--optional` for candidates. Do not write placeholder values such as `none` into `--missed`; leave it empty.
@@ -232,14 +245,18 @@ Skill Conflict Notice: creative-director conflicts with frontend-design on visua
 ```
 
 ```text
-Correction: switching from market-research only to market-research + deep-research + verification-loop because the task needs sourced claims.
+Skill Route Update: market-research -> market-research + deep-research + verification-loop
+Route Level: heavy
+Why: the task now needs sourced claims and completion verification
+Action: add research verification before finishing
 ```
 
-## Health Report
+## Optional Diagnostics
 
-`skill_health_report.py` writes `skill-health-report.md` next to the trace files. It highlights:
+`skill_health_report.py` writes `skill-health-report.md` next to the trace files. This is a router-debugging report, not a product promise that every real skill use is counted. Before judging routing quality, it checks whether the trace pipeline itself is complete.
 
-- confidence level based on sample size and trace quality
+- trace coverage: route decisions, completion reviews, paired route ids, unreviewed decisions, and legacy review-only events
+- confidence level based on sample size and paired trace quality
 - invalid or polluted trace rows
 - repeated missed skills
 - overused skills
@@ -249,7 +266,7 @@ Correction: switching from market-research only to market-research + deep-resear
 - onboarding state for project/user instructions
 - project-instruction update recommendations
 
-The report is a routing diagnostic, not an exact accuracy score. `Recommended Candidates Not Used` means "suggested but not necessarily required"; use `Required But Unused` and `Repeated Misses` for stronger failure signals.
+The report is an optional routing diagnostic, not an exact accuracy score. It cannot infer real skill usage rate, total token usage, or all tasks performed outside the trace. If it says `insufficient_data`, do not draw product conclusions from it. `Recommended Candidates Not Used` means "suggested but not necessarily required"; use `Required But Unused` and `Repeated Misses` for stronger failure signals.
 
 ## License
 

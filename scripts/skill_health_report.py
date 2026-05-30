@@ -10,12 +10,38 @@ from onboarding_check import check_target
 from skill_router_common import clean_skill_list, default_out_dir, load_known_skill_names, load_trace_events, router_identity
 
 
+REVIEW_EVENT_TYPES = {"usage_review", "correction", "manual_feedback", "legacy_usage_review"}
+
+
 def top(counter: Counter[str], limit: int = 10) -> list[dict[str, object]]:
     return [{"name": name, "count": count} for name, count in counter.most_common(limit)]
 
 
+def event_type(event: dict[str, object]) -> str:
+    value = str(event.get("event_type", "") or "").strip()
+    return value or "legacy_usage_review"
+
+
+def route_id(event: dict[str, object]) -> str:
+    return str(event.get("route_id", "") or "").strip()
+
+
+def coverage_status(route_decisions: list[dict[str, object]], reviews: list[dict[str, object]], paired_count: int) -> str:
+    if not route_decisions and not reviews:
+        return "empty"
+    if not route_decisions:
+        return "feedback_only"
+    if not reviews:
+        return "decisions_without_reviews"
+    if paired_count == len(route_decisions) == len(reviews) and paired_count < 3:
+        return "too_few_paired_events"
+    if paired_count < max(3, int(len(route_decisions) * 0.3)):
+        return "decision_review_gap"
+    return "tracked"
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create a health report for skill-routing feedback.")
+    parser = argparse.ArgumentParser(description="Create an observability-first health report for skill routing traces.")
     parser.add_argument("--out-dir", default=str(default_out_dir()))
     parser.add_argument("--project", default=".", help="Project folder used for onboarding status checks.")
     parser.add_argument("--host", default="codex", choices=known_hosts() + ["all"], help="Host profile to check for onboarding.")
@@ -30,6 +56,17 @@ def main() -> int:
     events, invalid_lines = load_trace_events(trace_path)
     known_names = load_known_skill_names(out_dir)
 
+    route_decisions = [event for event in events if event_type(event) == "route_decision"]
+    reviews = [event for event in events if event_type(event) in REVIEW_EVENT_TYPES]
+    legacy_reviews = [event for event in reviews if event_type(event) == "legacy_usage_review"]
+
+    decision_ids = {route_id(event) for event in route_decisions if route_id(event)}
+    review_ids = {route_id(event) for event in reviews if route_id(event)}
+    paired_ids = decision_ids & review_ids
+    unreviewed_ids = decision_ids - review_ids
+    orphan_review_ids = review_ids - decision_ids
+
+    event_types = Counter(event_type(event) for event in events)
     missed = Counter()
     overused = Counter()
     conflicts = Counter()
@@ -41,10 +78,9 @@ def main() -> int:
     notices_required = 0
     notices_missing = 0
     corrections_taken = 0
-
     recent_attention: list[str] = []
 
-    for event in events:
+    for event in reviews:
         normalization = event.get("normalization")
         if isinstance(normalization, dict):
             for notes in normalization.values():
@@ -52,7 +88,7 @@ def main() -> int:
                     data_quality.update(str(note) for note in notes)
 
         task = str(event.get("task", "")).strip()
-        severity = str(event.get("severity", "info"))
+        severity = str(event.get("severity", "info") or "info")
         severity_counts[severity] += 1
         route_levels[str(event.get("route_level", "unknown") or "unknown")] += 1
 
@@ -96,21 +132,19 @@ def main() -> int:
         instruction_recommendations.append(
             f"Add skill-routing onboarding to `{target['instruction']}` for {target['host_name']} ({target['label']} scope)."
         )
+    if coverage_status(route_decisions, reviews, len(paired_ids)) != "tracked":
+        instruction_recommendations.append(
+            "Improve trace coverage: record route decisions with `route_task.py --trace`, then record completion reviews with the same `--route-id`."
+        )
     for skill, count in missed.most_common():
         if count >= args.threshold:
-            instruction_recommendations.append(
-                f"Add a default route hint for `{skill}` because it was missed {count} times."
-            )
+            instruction_recommendations.append(f"Add a default route hint for `{skill}` because it was missed {count} times in reviews.")
     for skill, count in overused.most_common():
         if count >= args.threshold:
-            instruction_recommendations.append(
-                f"Add a caution note for `{skill}` because it was overused {count} times."
-            )
+            instruction_recommendations.append(f"Add a caution note for `{skill}` because it was overused {count} times in reviews.")
     for cluster, count in conflict_clusters.most_common():
         if count >= 2:
-            instruction_recommendations.append(
-                f"Add a conflict-order rule for `{cluster}` because this conflict appeared {count} times."
-            )
+            instruction_recommendations.append(f"Add a conflict-order rule for `{cluster}` because this conflict appeared {count} times.")
     for patch, count in patch_suggestions.most_common():
         if count >= 1:
             instruction_recommendations.append(f"Suggested instruction patch ({count}x): {patch}")
@@ -119,11 +153,17 @@ def main() -> int:
     repeated_overused = any(count >= args.threshold for count in overused.values())
     repeated_conflicts = any(count >= args.threshold for count in conflicts.values())
     repeated_conflict_clusters = any(count >= 2 for count in conflict_clusters.values())
+    observability = coverage_status(route_decisions, reviews, len(paired_ids))
 
     health = "good"
     if (
-        notices_missing
+        observability != "tracked"
+        or len(reviews) < 30
         or invalid_lines
+    ):
+        health = "insufficient_data"
+    if (
+        notices_missing
         or onboarding_missing
         or repeated_missed
         or repeated_overused
@@ -133,19 +173,34 @@ def main() -> int:
         health = "needs_attention"
     if severity_counts.get("blocker", 0):
         health = "blocked"
-    confidence = "medium"
-    if len(events) < 30:
-        confidence = "low"
-    if len(events) >= 100:
+
+    confidence = "low"
+    if observability == "tracked" and len(reviews) >= 30:
+        confidence = "medium"
+    if observability == "tracked" and len(reviews) >= 100:
         confidence = "high"
+
+    coverage = {
+        "observability": observability,
+        "total_events": len(events),
+        "route_decisions": len(route_decisions),
+        "usage_reviews": len(reviews),
+        "legacy_review_only_events": len(legacy_reviews),
+        "paired_route_ids": len(paired_ids),
+        "unreviewed_route_decisions": len(unreviewed_ids),
+        "reviews_without_matching_decision": len(orphan_review_ids),
+        "decisions_without_route_id": sum(1 for event in route_decisions if not route_id(event)),
+        "reviews_without_route_id": sum(1 for event in reviews if not route_id(event)),
+    }
 
     report = {
         "trace_file": str(trace_path),
         "router_identity": router_identity(),
-        "events": len(events),
-        "invalid_json_lines": invalid_lines,
         "health": health,
         "confidence": confidence,
+        "coverage": coverage,
+        "event_types": dict(event_types),
+        "invalid_json_lines": invalid_lines,
         "severity_counts": dict(severity_counts),
         "route_levels": dict(route_levels),
         "attention_thresholds": {
@@ -173,34 +228,55 @@ def main() -> int:
 
     report_path = out_dir / "skill-health-report.md"
     lines = [
-        "# Skill Routing Health Report",
+        "# Skill Routing Observability Report",
         "",
         f"Trace file: `{trace_path}`",
         f"Router identity: `{router_identity()['canonical_skill_id']}` ({router_identity()['display_name']})",
-        f"Events: {len(events)}",
-        f"Invalid JSONL lines: {len(invalid_lines)}",
         f"Health: `{health}`",
         f"Confidence: `{confidence}`",
-        f"Attention threshold: repeated skill signals >= {args.threshold}; repeated conflict clusters >= 2",
+        f"Observability: `{observability}`",
         "",
-        "> Confidence is about sample size and data quality. This report is a routing diagnostic, not a statistically valid accuracy score.",
+        "> This report is a routing observability diagnostic. It cannot count total skill invocations unless route decisions and completion reviews are both recorded.",
         "",
-        "## Notice Coverage",
+        "## What This Report Can Say",
+        "",
+        "- It can analyze recorded route decisions, completion reviews, misses, overuse, conflicts, and onboarding status.",
+        "- It can identify repeated recorded problems after enough paired data exists.",
+        "- It cannot infer real skill usage rate, total token usage, or all tasks performed outside the trace.",
+        "",
+        "## Trace Coverage",
+        "",
+        f"- Total trace events: {coverage['total_events']}",
+        f"- Route decisions: {coverage['route_decisions']}",
+        f"- Completion/feedback reviews: {coverage['usage_reviews']}",
+        f"- Paired route ids: {coverage['paired_route_ids']}",
+        f"- Unreviewed route decisions: {coverage['unreviewed_route_decisions']}",
+        f"- Reviews without matching decision: {coverage['reviews_without_matching_decision']}",
+        f"- Legacy review-only events: {coverage['legacy_review_only_events']}",
+        f"- Invalid JSONL lines: {len(invalid_lines)}",
+        "",
+        "## Event Types",
+        "",
+    ]
+    lines.extend([f"- `{name}`: {count}" for name, count in event_types.most_common()] or ["- none"])
+    lines.extend([
+        "",
+        "## Notice Coverage (Review Events Only)",
         "",
         f"- Required: {notices_required}",
         f"- Shown: {notices_required - notices_missing}",
         f"- Missing: {notices_missing}",
         f"- Corrections taken: {corrections_taken}",
         "",
-        "## Repeated Misses",
+        "## Repeated Misses (Review Events Only)",
         "",
-    ]
+    ])
     lines.extend([f"- `{item['name']}`: {item['count']}" for item in report["repeated_missed"]] or ["- none"])
-    lines.extend(["", "## Overuse Patterns", ""])
+    lines.extend(["", "## Overuse Patterns (Review Events Only)", ""])
     lines.extend([f"- `{item['name']}`: {item['count']}" for item in report["repeated_overused"]] or ["- none"])
-    lines.extend(["", "## Route Levels", ""])
+    lines.extend(["", "## Route Levels (Review Events Only)", ""])
     lines.extend([f"- `{name}`: {count}" for name, count in route_levels.most_common()] or ["- none"])
-    lines.extend(["", "## Conflict Clusters", ""])
+    lines.extend(["", "## Conflict Clusters (Review Events Only)", ""])
     lines.extend([f"- `{item['name']}`: {item['count']}" for item in report["conflict_clusters"]] or ["- none"])
     lines.extend(["", "## Data Quality", ""])
     if invalid_lines:
@@ -227,14 +303,13 @@ def main() -> int:
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
-        print(f"events={len(events)}")
-        if invalid_lines:
-            print(f"invalid_json_lines={len(invalid_lines)}")
         print(f"health={health}")
         print(f"confidence={confidence}")
+        print(f"observability={observability}")
+        print(f"route_decisions={len(route_decisions)}")
+        print(f"usage_reviews={len(reviews)}")
+        print(f"paired_route_ids={len(paired_ids)}")
         print(f"report={report_path}")
-        if notices_missing:
-            print(f"missing_notices={notices_missing}")
         if instruction_recommendations:
             print(f"instruction_recommendations={len(instruction_recommendations)}")
     return 0

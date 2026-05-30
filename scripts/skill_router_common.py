@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
 from pathlib import Path
 import json
 import os
 import re
 from collections import Counter, defaultdict
+import uuid
 
 
 ROUTER_CANONICAL_ID = "skill-auto-router"
 ROUTER_DISPLAY_NAME = "Skill Auto Router"
 ROUTER_REPO_SLUG = "Skill_auto_router"
 ROUTER_LEGACY_ID = "skill-router-cartographer"
-TRACE_SCHEMA_VERSION = 2
+TRACE_SCHEMA_VERSION = 3
 
 
 TOPIC_KEYWORDS: dict[str, list[str]] = {
@@ -45,6 +47,8 @@ CHINESE_PHRASES = [
     "封面", "主视觉", "标题图", "横版", "竖版", "海报", "视觉", "分镜",
     "小红书", "朋友圈", "草稿箱",
     "技能路由", "路由器", "路由健康", "健康报告", "健康状态", "安装状态",
+    "重新路由", "中途路由", "路由更新", "中途检查", "追加技能", "换技能",
+    "派单", "结案", "复盘日志", "记录口径",
     "代码", "代码库", "代码审核", "代码审查", "代码索引", "知识图谱", "架构图",
     "模块关系", "调用图", "依赖图", "增量审查", "增量审核", "全量阅读", "全量扫描",
     "接手项目", "理解代码", "项目记忆", "架构记忆", "踩坑记录",
@@ -149,6 +153,33 @@ def default_skills_dir() -> Path:
 
 def default_out_dir() -> Path:
     return codex_home() / "skill-router"
+
+
+def new_trace_id() -> str:
+    return str(uuid.uuid4())
+
+
+def trace_file(out_dir: Path) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir / "skill-trace.jsonl"
+
+
+def base_trace_event(event_type: str, source: str = "manual") -> dict[str, object]:
+    return {
+        "trace_schema_version": TRACE_SCHEMA_VERSION,
+        "router_identity": router_identity(),
+        "id": new_trace_id(),
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event_type": event_type,
+        "source": source,
+    }
+
+
+def append_trace_event(out_dir: Path, event: dict[str, object]) -> Path:
+    path = trace_file(out_dir.expanduser().resolve())
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    return path
 
 
 def router_identity() -> dict[str, object]:

@@ -8,9 +8,12 @@ from host_profiles import known_hosts, profiles_for, skill_roots_for
 from skill_router_common import (
     ROUTER_CANONICAL_ID,
     SKILL_ALIASES,
+    append_trace_event,
+    base_trace_event,
     default_out_dir,
     default_skills_dir,
     load_map,
+    new_trace_id,
     normalize_skill_item,
     scan_skills,
     tokenize,
@@ -38,7 +41,25 @@ CURATED_BOOSTS = [
     (ROUTER_CANONICAL_ID, ["健康报告"], 40, "curated: router health report"),
     (ROUTER_CANONICAL_ID, ["健康状态"], 40, "curated: router health status"),
     (ROUTER_CANONICAL_ID, ["路由健康"], 40, "curated: router health"),
+    (ROUTER_CANONICAL_ID, ["trace"], 40, "curated: router trace telemetry"),
+    (ROUTER_CANONICAL_ID, ["route_decision"], 44, "curated: router route-decision trace"),
+    (ROUTER_CANONICAL_ID, ["usage_review"], 44, "curated: router usage-review trace"),
+    (ROUTER_CANONICAL_ID, ["记录口径"], 44, "curated: router trace methodology"),
+    (ROUTER_CANONICAL_ID, ["复盘日志"], 40, "curated: router feedback log"),
+    (ROUTER_CANONICAL_ID, ["派单"], 34, "curated: route assignment metaphor"),
+    (ROUTER_CANONICAL_ID, ["结案"], 34, "curated: route review metaphor"),
     (ROUTER_CANONICAL_ID, ["技能路由"], 40, "curated: skill routing"),
+    (ROUTER_CANONICAL_ID, ["reroute"], 46, "curated: mid-task reroute"),
+    (ROUTER_CANONICAL_ID, ["re-route"], 46, "curated: mid-task reroute"),
+    (ROUTER_CANONICAL_ID, ["route", "update"], 42, "curated: route update"),
+    (ROUTER_CANONICAL_ID, ["mid-task"], 40, "curated: mid-task route checkpoint"),
+    (ROUTER_CANONICAL_ID, ["checkpoint"], 34, "curated: route checkpoint"),
+    (ROUTER_CANONICAL_ID, ["重新路由"], 52, "curated: mid-task reroute in Chinese"),
+    (ROUTER_CANONICAL_ID, ["中途路由"], 48, "curated: mid-task reroute in Chinese"),
+    (ROUTER_CANONICAL_ID, ["路由更新"], 46, "curated: route update in Chinese"),
+    (ROUTER_CANONICAL_ID, ["中途检查"], 42, "curated: route checkpoint in Chinese"),
+    (ROUTER_CANONICAL_ID, ["追加技能"], 40, "curated: add skill during task"),
+    (ROUTER_CANONICAL_ID, ["换技能"], 38, "curated: replace skill during task"),
     ("market-research", ["market", "research"], 28, "curated: market research"),
     ("deep-research", ["research"], 18, "curated: deep/cited research"),
     ("deep-research", ["cited"], 12, "curated: citations requested"),
@@ -547,6 +568,9 @@ def main() -> int:
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--limit", type=int, default=8)
+    parser.add_argument("--trace", action="store_true", help="Append a route_decision event to the local trace.")
+    parser.add_argument("--route-id", default="", help="Route id to use when --trace is enabled. A new one is generated if omitted.")
+    parser.add_argument("--out-dir", default=str(default_out_dir()), help="Trace output directory when --trace is enabled.")
     args = parser.parse_args()
 
     query_text = " ".join(args.task).lower()
@@ -609,8 +633,10 @@ def main() -> int:
     if verification is None:
         verification = next((route_name(item["skill"].name) for item in ranked if route_name(item["skill"].name) in VERIFICATION_HINTS), None)
 
+    route_id = args.route_id.strip() or (new_trace_id() if args.trace else "")
     payload = {
         "task": " ".join(args.task),
+        "route_id": route_id,
         "route_level": gate["route_level"],
         "gate": gate,
         "primary": primary,
@@ -629,14 +655,47 @@ def main() -> int:
         ],
     }
 
+    trace_path = None
+    if args.trace:
+        recommended_names = [item["name"] for item in payload["recommended"]]
+        event = {
+            **base_trace_event("route_decision", "route_task"),
+            "route_id": route_id,
+            "task": payload["task"][:500],
+            "project": str(Path(args.project).expanduser().resolve())[:300],
+            "host": args.host,
+            "recommended": recommended_names,
+            "required": [primary] if primary else [],
+            "optional": [name for name in recommended_names if name != primary],
+            "used": [],
+            "missed": [],
+            "overused": [],
+            "route_level": gate["route_level"],
+            "fit": "unknown",
+            "severity": "info",
+            "notice_shown": False,
+            "correction_taken": False,
+            "conflicts": [],
+            "status": "pending_review",
+            "normalization": {},
+            "next_instruction_patch": "",
+            "note": "Route decision only; pair with a usage_review event after the task.",
+        }
+        trace_path = append_trace_event(Path(args.out_dir), event)
+        payload["trace_path"] = str(trace_path)
+
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(f"task={payload['task']}")
         print(f"route_level={payload['route_level']}")
+        if route_id:
+            print(f"route_id={route_id}")
         print(f"gate_reason={payload['gate']['reason']}")
         print(f"primary={primary or 'none'}")
         print(f"verification={verification or 'none'}")
+        if trace_path is not None:
+            print(f"trace={trace_path}")
         print("recommended:")
         for item in payload["recommended"]:
             print(f"- {item['name']} score={item['score']} reasons={'; '.join(item['reasons'])}")

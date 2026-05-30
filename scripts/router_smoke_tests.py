@@ -81,6 +81,15 @@ SAMPLE_SKILLS = [
         "triggers": [],
         "keywords": ["mvp", "experiment"],
     },
+    {
+        "name": "skill-auto-router",
+        "folder": "skill-auto-router",
+        "path": "skill-auto-router",
+        "description": "Route tasks to installed skills and update the route when the work changes phase.",
+        "topics": ["automation"],
+        "triggers": [],
+        "keywords": ["skill", "router", "route", "reroute", "checkpoint"],
+    },
 ]
 
 
@@ -124,6 +133,11 @@ CASES = [
         "task": "帮我设计 MVP 的最小可行实验",
         "route_level": "heavy",
         "primary": "opc-mvp-designer",
+    },
+    {
+        "task": "任务做到一半发现要重新路由，追加技能并做中途检查",
+        "route_level": "heavy",
+        "primary": "skill-auto-router",
     },
 ]
 

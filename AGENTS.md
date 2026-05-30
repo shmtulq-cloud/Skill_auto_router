@@ -17,7 +17,9 @@ When changing routing logic, protect these behaviors:
 - Ordinary Chinese phrases should trigger useful workflows without requiring the user to remember skill names.
 - Simple rewriting, basic explanations, short keyword brainstorming, translation, and lightweight naming should not trigger skill overhead.
 - Broad business-building prompts such as "商业验证 + MVP + 试卖" should prefer `opc-orchestrator`; narrow MVP-stage prompts should prefer `opc-mvp-designer`.
-- Feedback traces must normalize aliases to `skill-auto-router` and must not store secrets, full prompts, raw files, or private conversation text.
+- Mid-task phase changes must trigger a route checkpoint: if the work shifts into research, source verification, code/debugging, tests, visuals, GitHub, deployment, privacy/security, business/product workflow, or a new deliverable, show `Skill Route Update` and record a `correction` when tracing is active.
+- Feedback traces are optional diagnostics, not the default user experience. When tracing is explicitly active, normalize aliases to `skill-auto-router` and do not store secrets, full prompts, raw files, or private conversation text.
+- Health reports must be observability-first and honest about coverage. They are not full skill-usage analytics; unpaired legacy review events are not real skill-usage telemetry.
 
 Before finishing routing changes, run:
 
